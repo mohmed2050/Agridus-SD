@@ -4,6 +4,7 @@ import '../providers/app_provider.dart';
 import 'crops_screen.dart';
 import 'news_screen.dart';
 import 'weather_screen.dart';
+import 'calendar_screen.dart';
 import 'tasks_screen.dart';
 import 'settings_screen.dart';
 
@@ -14,6 +15,7 @@ class HomeScreen extends StatelessWidget {
     CropsScreen(),
     NewsScreen(),
     WeatherScreen(),
+    CalendarScreen(),
     TasksScreen(),
     SettingsScreen(),
   ];
@@ -42,6 +44,10 @@ class HomeScreen extends StatelessWidget {
               BottomNavigationBarItem(
                 icon: Icon(Icons.wb_sunny),
                 label: 'الطقس',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.calendar_month),
+                label: 'التقويم',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.checklist),

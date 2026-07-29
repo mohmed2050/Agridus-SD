@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/crop.dart';
+import 'guide_screen.dart';
 
 class CropDetailScreen extends StatelessWidget {
   final Crop crop;
@@ -41,6 +42,60 @@ class CropDetailScreen extends StatelessWidget {
           _buildSection('طريقة الزراعة', crop.plantingMethod, Icons.grass),
           _buildSection('فترات الري', crop.irrigation, Icons.water_drop),
           _buildSection('التسميد', crop.fertilization, Icons.eco),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.science, size: 18),
+                    label: const Text('المبيدات الموصى بها',
+                        style: TextStyle(fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.red.shade700,
+                      side: BorderSide(color: Colors.red.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GuideScreen(
+                            initialCropId: crop.id,
+                            initialTab: 0,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.eco, size: 18),
+                    label: const Text('الأسمدة الموصى بها',
+                        style: TextStyle(fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2E7D32),
+                      side: BorderSide(color: Colors.green.shade300),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => GuideScreen(
+                            initialCropId: crop.id,
+                            initialTab: 1,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
           _buildSection('الحصاد', crop.harvest, Icons.content_cut),
           _buildSection(
               'الربحية', crop.profitability, Icons.trending_up),
