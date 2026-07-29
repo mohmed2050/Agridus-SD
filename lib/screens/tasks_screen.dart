@@ -213,7 +213,7 @@ class _TasksScreenState extends State<TasksScreen>
                     ),
                     const SizedBox(height: 16),
                     DropdownButtonFormField<String>(
-                      value: recurrence,
+                      initialValue: recurrence,
                       decoration: const InputDecoration(
                         labelText: 'التكرار',
                         border: OutlineInputBorder(),

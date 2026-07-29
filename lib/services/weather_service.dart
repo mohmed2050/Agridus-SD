@@ -145,8 +145,10 @@ class WeatherService {
       calculationParameters: params,
     );
 
-    final format = (DateTime dt) =>
-        '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    String format(DateTime dt) {
+      final khartoum = dt.add(const Duration(hours: 2));
+      return '${khartoum.hour.toString().padLeft(2, '0')}:${khartoum.minute.toString().padLeft(2, '0')}';
+    }
 
     return PrayerTimeData(
       fajr: format(prayerTimes.fajr),

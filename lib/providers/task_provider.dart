@@ -84,14 +84,14 @@ class TaskProvider extends ChangeNotifier {
   Future<void> addTask(TaskItem task) async {
     final db = DatabaseService();
     final id = await db.insert('tasks', task.toMap());
-    _tasks.insert(0, task.copyWith(id: id));
+    final newTask = task.copyWith(id: id);
+    _tasks.insert(0, newTask);
+    notifyListeners();
 
     if (task.alertTime != null) {
-      await NotificationService()
+      NotificationService()
           .scheduleTaskNotification(id, task.title, task.alertTime!);
     }
-
-    notifyListeners();
   }
 
   Future<void> toggleComplete(int taskId) async {

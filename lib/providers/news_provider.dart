@@ -15,6 +15,11 @@ class NewsProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    _articles = await NewsService.getCachedNews();
+    _isOffline = true;
+    _isLoading = false;
+    notifyListeners();
+
     final connectivity = await Connectivity().checkConnectivity();
     final hasInternet = connectivity.any((r) =>
         r == ConnectivityResult.wifi ||
@@ -22,20 +27,17 @@ class NewsProvider extends ChangeNotifier {
         r == ConnectivityResult.ethernet);
 
     if (hasInternet) {
+      _isLoading = true;
+      notifyListeners();
+
       final fetched = await NewsService.fetchNews();
       if (fetched.isNotEmpty) {
         _articles = fetched;
         _isOffline = false;
-      } else {
-        _articles = await NewsService.getCachedNews();
-        _isOffline = _articles.isEmpty ? false : true;
       }
-    } else {
-      _articles = await NewsService.getCachedNews();
-      _isOffline = true;
-    }
 
-    _isLoading = false;
-    notifyListeners();
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

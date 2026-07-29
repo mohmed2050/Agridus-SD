@@ -37,9 +37,7 @@ class AgridusApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('ar', 'SD'),
-        ],
+        supportedLocales: const [Locale('ar', 'SD')],
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
             seedColor: const Color(0xFF2E7D32),
