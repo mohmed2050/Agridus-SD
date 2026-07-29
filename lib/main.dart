@@ -16,7 +16,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await NotificationService().init();
   final appProvider = AppProvider();
-  await appProvider.loadDarkMode();
+  await appProvider.loadAll();
   runApp(AgridusApp(appProvider: appProvider));
 }
 
@@ -74,6 +74,14 @@ class AgridusApp extends StatelessWidget {
             ),
             themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
             home: const HomeScreen(),
+            builder: (context, child) {
+              return MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(provider.fontScale),
+                ),
+                child: child!,
+              );
+            },
           );
         },
       ),

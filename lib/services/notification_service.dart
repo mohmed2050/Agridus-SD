@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -10,6 +11,29 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+
+  bool _globalEnabled = true;
+  bool _prayerEnabled = true;
+  bool _weatherEnabled = true;
+  bool _taskEnabled = true;
+  bool _calendarEnabled = true;
+  int _vibration = 2;
+
+  void updateSettings({
+    required bool globalEnabled,
+    required bool prayerEnabled,
+    required bool weatherEnabled,
+    required bool taskEnabled,
+    required bool calendarEnabled,
+    required int vibrationIntensity,
+  }) {
+    _globalEnabled = globalEnabled;
+    _prayerEnabled = prayerEnabled;
+    _weatherEnabled = weatherEnabled;
+    _taskEnabled = taskEnabled;
+    _calendarEnabled = calendarEnabled;
+    _vibration = vibrationIntensity;
+  }
 
   Future<void> init() async {
     if (_initialized) return;
@@ -61,24 +85,60 @@ class NotificationService {
           playSound: true,
         ),
       );
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'calendar_channel',
+          'تنبيهات التقويم',
+          description: 'إشعارات التقويم الزراعي',
+          importance: Importance.high,
+          playSound: true,
+        ),
+      );
     }
 
     _initialized = true;
   }
 
   Future<void> showWeatherAlert(String message) async {
+    if (!_globalEnabled || !_weatherEnabled) return;
+    await _show(1000, 'تنبيه زراعي - طقس غير مناسب اليوم', message,
+        'weather_channel', 'تنبيهات الطقس');
+  }
+
+  Future<void> showPrayerNotification(String prayerName) async {
+    if (!_globalEnabled || !_prayerEnabled) return;
+    await _show(2000 + prayerName.hashCode, 'حان الآن وقت صلاة $prayerName',
+        'حان وقت صلاة $prayerName - لا تنسَ ذكر الله',
+        'prayer_channel', 'مواقيت الصلاة');
+  }
+
+  Future<void> showTaskNotification(String title) async {
+    if (!_globalEnabled || !_taskEnabled) return;
+    await _show(title.hashCode.abs(), 'تذكير بالمهمة: $title',
+        'حان وقت تنفيذ المهمة', 'task_channel', 'تنبيهات المهام');
+  }
+
+  Future<void> showCalendarAlert(String title) async {
+    if (!_globalEnabled || !_calendarEnabled) return;
+    await _show(title.hashCode.abs() + 5000, 'تنبيه التقويم الزراعي',
+        title, 'calendar_channel', 'تنبيهات التقويم');
+  }
+
+  Future<void> _show(int id, String title, String body,
+      String channelId, String channelName) async {
     await _plugin.show(
-      1000,
-      'تنبيه زراعي - طقس غير مناسب اليوم',
-      message,
-      const NotificationDetails(
+      id,
+      title,
+      body,
+      NotificationDetails(
         android: AndroidNotificationDetails(
-          'weather_channel',
-          'تنبيهات الطقس',
+          channelId,
+          channelName,
           importance: Importance.high,
           priority: Priority.high,
+          vibrationPattern: _getVibrationPattern(),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
         ),
@@ -86,28 +146,19 @@ class NotificationService {
     );
   }
 
-  Future<void> showPrayerNotification(String prayerName) async {
-    await _plugin.show(
-      2000 + prayerName.hashCode,
-      'حان الآن وقت صلاة $prayerName',
-      'حان وقت صلاة $prayerName - لا تنسَ ذكر الله',
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'prayer_channel',
-          'مواقيت الصلاة',
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-        iOS: DarwinNotificationDetails(
-          presentAlert: true,
-          presentSound: true,
-        ),
-      ),
-    );
+  Int64List? _getVibrationPattern() {
+    switch (_vibration) {
+      case 0: return null;
+      case 1: return Int64List.fromList([0, 100]);
+      case 2: return Int64List.fromList([0, 300]);
+      case 3: return Int64List.fromList([0, 100, 50, 100, 50, 300]);
+      default: return null;
+    }
   }
 
   Future<void> schedulePrayerNotification(
       int id, String prayerName, DateTime time) async {
+    if (!_globalEnabled || !_prayerEnabled) return;
     final now = DateTime.now();
     final scheduledDate = time.isBefore(now)
         ? time.add(const Duration(days: 1))
@@ -118,14 +169,15 @@ class NotificationService {
       'حان الآن وقت صلاة $prayerName',
       'حان وقت صلاة $prayerName',
       tz.TZDateTime.from(scheduledDate, tz.local),
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'prayer_channel',
           'مواقيت الصلاة',
           importance: Importance.high,
           priority: Priority.high,
+          vibrationPattern: _getVibrationPattern(),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
         ),
@@ -139,20 +191,21 @@ class NotificationService {
 
   Future<void> scheduleTaskNotification(
       int id, String title, DateTime time) async {
+    if (!_globalEnabled || !_taskEnabled) return;
     await _plugin.zonedSchedule(
       id,
       'تذكير بالمهمة: $title',
       'حان وقت تنفيذ المهمة',
       tz.TZDateTime.from(time, tz.local),
-      const NotificationDetails(
+      NotificationDetails(
         android: AndroidNotificationDetails(
           'task_channel',
           'تنبيهات المهام',
           importance: Importance.high,
           priority: Priority.high,
-          playSound: true,
+          vibrationPattern: _getVibrationPattern(),
         ),
-        iOS: DarwinNotificationDetails(
+        iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
         ),
