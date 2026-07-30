@@ -24,22 +24,27 @@ class WeatherProvider extends ChangeNotifier {
 
     try {
       await _requestLocation().timeout(const Duration(seconds: 10));
-    } catch (_) {
-      // location timeout — use defaults
+    } catch (_) {}
+
+    try {
+      _weather = await WeatherService
+          .fetchWeather(lat: _lat, lon: _lon)
+          .timeout(const Duration(seconds: 15));
+    } catch (_) {}
+
+    _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);
+
+    if (_weather != null) {
+      try {
+        await WeatherService.checkWeatherAlert(_weather!);
+      } catch (_) {}
     }
 
     try {
-      _weather = await WeatherService.fetchWeather(lat: _lat, lon: _lon);
-      _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);
-
-      if (_weather != null) {
-        await WeatherService.checkWeatherAlert(_weather!);
-      }
-
-      await WeatherService.schedulePrayerNotifications(lat: _lat, lon: _lon);
-    } catch (_) {
-      _error = 'تعذر تحميل بيانات الطقس';
-    }
+      await WeatherService
+          .schedulePrayerNotifications(lat: _lat, lon: _lon)
+          .timeout(const Duration(seconds: 10));
+    } catch (_) {}
 
     _isLoading = false;
     notifyListeners();

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/notification_service.dart';
 
 class AppProvider extends ChangeNotifier {
   int _currentTabIndex = 0;
@@ -70,6 +71,7 @@ class AppProvider extends ChangeNotifier {
     _selectedSoundIndex = prefs.getInt('selected_sound') ?? 0;
     _vibrationIntensity = prefs.getInt('vibration_intensity') ?? 2;
     _fontScale = prefs.getDouble('font_scale') ?? 1.0;
+    NotificationService().setSelectedSound(_selectedSoundIndex);
     notifyListeners();
   }
 
@@ -119,6 +121,7 @@ class AppProvider extends ChangeNotifier {
     _selectedSoundIndex = index;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('selected_sound', index);
+    NotificationService().setSelectedSound(index);
     notifyListeners();
   }
 
