@@ -1,7 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/calendar_provider.dart';
 import '../models/calendar_entry.dart';
+import '../models/crop.dart';
+import 'crop_detail_screen.dart';
 
 class CalendarScreen extends StatefulWidget {
   const CalendarScreen({super.key});
@@ -11,12 +15,21 @@ class CalendarScreen extends StatefulWidget {
 }
 
 class _CalendarScreenState extends State<CalendarScreen> {
+  List<Crop>? _crops;
+
   @override
   void initState() {
     super.initState();
+    _loadCrops();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CalendarProvider>().loadData();
     });
+  }
+
+  Future<void> _loadCrops() async {
+    final json = await rootBundle.loadString('assets/data/crops.json');
+    final data = jsonDecode(json)['crops'] as List;
+    _crops = data.map((e) => Crop.fromJson(e)).toList();
   }
 
   @override
@@ -153,9 +166,39 @@ class _CalendarScreenState extends State<CalendarScreen> {
             ),
             const Divider(),
             _buildInfoRow('موسم الزراعة', '${entry.plantingStart} - ${entry.plantingEnd}'),
+            const Divider(height: 8),
+            const Text('الري',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF2E7D32))),
+            const SizedBox(height: 4),
             _buildInfoRow('أول ري', 'بعد ${entry.firstIrrigationDays} أيام'),
+            if (_crops != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: GestureDetector(
+                  onTap: () {
+                    final crop = _crops!.firstWhere((c) => c.id == entry.cropId,
+                        orElse: () => _crops!.first);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CropDetailScreen(crop: crop),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    'عرض جدول الري الكامل ←',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade700,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ),
+            const Divider(height: 8),
             _buildInfoRow('التسميد الأول', 'بعد ${entry.firstFertilizerDays} يوماً'),
             _buildInfoRow('التسميد الثاني', 'بعد ${entry.secondFertilizerDays} يوماً'),
+            const Divider(height: 8),
             _buildInfoRow('الحصاد', 'بعد ${entry.harvestDays} يوماً'),
             const SizedBox(height: 12),
             Row(

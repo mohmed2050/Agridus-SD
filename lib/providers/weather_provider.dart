@@ -7,6 +7,7 @@ class WeatherProvider extends ChangeNotifier {
   PrayerTimeData? _prayerTimes;
   bool _isLoading = false;
   bool _hasLocation = false;
+  String? _error;
   double _lat = 15.5007;
   double _lon = 32.5599;
 
@@ -14,12 +15,18 @@ class WeatherProvider extends ChangeNotifier {
   PrayerTimeData? get prayerTimes => _prayerTimes;
   bool get isLoading => _isLoading;
   bool get hasLocation => _hasLocation;
+  String? get error => _error;
 
   Future<void> loadData() async {
     _isLoading = true;
+    _error = null;
     notifyListeners();
 
-    await _requestLocation();
+    try {
+      await _requestLocation().timeout(const Duration(seconds: 10));
+    } catch (_) {
+      // location timeout — use defaults
+    }
 
     _weather = await WeatherService.fetchWeather(lat: _lat, lon: _lon);
     _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);

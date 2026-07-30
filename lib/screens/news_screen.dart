@@ -147,9 +147,28 @@ class _NewsScreenState extends State<NewsScreen> {
                       label: const Text('اقرأ المزيد'),
                       onPressed: () async {
                         final uri = Uri.tryParse(article.url);
-                        if (uri != null && await canLaunchUrl(uri)) {
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
+                        if (uri != null) {
+                          final messenger = ScaffoldMessenger.of(context);
+                          try {
+                            if (await canLaunchUrl(uri)) {
+                              await launchUrl(uri,
+                                  mode: LaunchMode.externalApplication);
+                            } else {
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('عذراً، الرابط غير متاح حالياً'),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          } catch (_) {
+                            messenger.showSnackBar(
+                              const SnackBar(
+                                content: Text('عذراً، الرابط غير متاح حالياً'),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
                         }
                       },
                     ),

@@ -36,17 +36,47 @@ class _WeatherScreenState extends State<WeatherScreen> {
           ),
           body: provider.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: () => provider.loadData(),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      _buildWeatherCard(provider),
-                      const SizedBox(height: 16),
-                      _buildPrayerTimesCard(provider),
-                    ],
-                  ),
-                ),
+              : provider.error != null
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(32),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.cloud_off,
+                                size: 64, color: Colors.grey),
+                            const SizedBox(height: 16),
+                            Text(
+                              provider.error!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                  fontSize: 16, color: Colors.grey),
+                            ),
+                            const SizedBox(height: 24),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('إعادة المحاولة'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF2E7D32),
+                                foregroundColor: Colors.white,
+                              ),
+                              onPressed: () => provider.loadData(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => provider.loadData(),
+                      child: ListView(
+                        padding: const EdgeInsets.all(16),
+                        children: [
+                          _buildWeatherCard(provider),
+                          const SizedBox(height: 16),
+                          _buildPrayerTimesCard(provider),
+                        ],
+                      ),
+                    ),
         );
       },
     );
