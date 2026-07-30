@@ -28,14 +28,18 @@ class WeatherProvider extends ChangeNotifier {
       // location timeout — use defaults
     }
 
-    _weather = await WeatherService.fetchWeather(lat: _lat, lon: _lon);
-    _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);
+    try {
+      _weather = await WeatherService.fetchWeather(lat: _lat, lon: _lon);
+      _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);
 
-    if (_weather != null) {
-      await WeatherService.checkWeatherAlert(_weather!);
+      if (_weather != null) {
+        await WeatherService.checkWeatherAlert(_weather!);
+      }
+
+      await WeatherService.schedulePrayerNotifications(lat: _lat, lon: _lon);
+    } catch (_) {
+      _error = 'تعذر تحميل بيانات الطقس';
     }
-
-    await WeatherService.schedulePrayerNotifications(lat: _lat, lon: _lon);
 
     _isLoading = false;
     notifyListeners();
