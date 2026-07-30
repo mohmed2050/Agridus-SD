@@ -38,6 +38,7 @@ class NotificationService {
 
   void setSelectedSound(int index) {
     _selectedSound = index;
+    _recreatePrayerChannel();
   }
 
   AndroidNotificationDetails _soundDetails(String channelId, String channelName) {
@@ -47,7 +48,7 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
       vibrationPattern: _getVibrationPattern(),
-      sound: _getNotificationSound(),
+      sound: _selectedSound == 0 ? null : _getNotificationSound(),
     );
   }
 
@@ -58,6 +59,25 @@ class NotificationService {
       case 3: return const RawResourceAndroidNotificationSound('notification_islamic');
       default: return null;
     }
+  }
+
+  void _recreatePrayerChannel() {
+    try {
+      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      if (androidPlugin == null) return;
+      androidPlugin.deleteNotificationChannel('prayer_channel');
+      androidPlugin.createNotificationChannel(
+        AndroidNotificationChannel(
+          'prayer_channel',
+          'مواقيت الصلاة',
+          description: 'إشعارات مواقيت الصلاة',
+          importance: Importance.high,
+          playSound: _selectedSound != 4,
+          sound: _getNotificationSound(),
+        ),
+      );
+    } catch (_) {}
   }
 
   Future<void> init() async {
@@ -93,12 +113,13 @@ class NotificationService {
         ),
       );
       await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
+        AndroidNotificationChannel(
           'prayer_channel',
           'مواقيت الصلاة',
           description: 'إشعارات مواقيت الصلاة',
           importance: Importance.high,
-          playSound: true,
+          playSound: _selectedSound != 4,
+          sound: _getNotificationSound(),
         ),
       );
       await androidPlugin.createNotificationChannel(

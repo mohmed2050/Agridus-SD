@@ -36,37 +36,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
           ),
           body: provider.isLoading
               ? const Center(child: CircularProgressIndicator())
-              : provider.error != null
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(32),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.cloud_off,
-                                size: 64, color: Colors.grey),
-                            const SizedBox(height: 16),
-                            Text(
-                              provider.error!,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                  fontSize: 16, color: Colors.grey),
-                            ),
-                            const SizedBox(height: 24),
-                            ElevatedButton.icon(
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('إعادة المحاولة'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2E7D32),
-                                foregroundColor: Colors.white,
-                              ),
-                              onPressed: () => provider.loadData(),
-                            ),
-                          ],
-                        ),
-                      ),
-                    )
-                  : RefreshIndicator(
+              : RefreshIndicator(
                       onRefresh: () => provider.loadData(),
                       child: ListView(
                         padding: const EdgeInsets.all(16),
@@ -141,11 +111,27 @@ class _WeatherScreenState extends State<WeatherScreen> {
                         Icons.air, 'الرياح', '${weather.windSpeed.toStringAsFixed(0)} كم/س'),
                   ],
                 ),
-              ] else
+              ] else ...[
+                const Icon(Icons.cloud_off, color: Colors.white38, size: 48),
+                const SizedBox(height: 8),
                 const Text(
-                  'تعذر الحصول على بيانات الطقس',
+                  'تعذر تحميل بيانات الطقس',
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 32,
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('إعادة المحاولة', style: TextStyle(fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Colors.white54),
+                    ),
+                    onPressed: () => provider.loadData(),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
