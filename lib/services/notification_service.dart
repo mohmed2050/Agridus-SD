@@ -108,6 +108,11 @@ class NotificationService {
       try {
         await androidPlugin.requestNotificationsPermission();
       } catch (_) {}
+      for (final ch in _prayerChannels) {
+        try {
+          await androidPlugin.deleteNotificationChannel(ch.id);
+        } catch (_) {}
+      }
       await androidPlugin.createNotificationChannel(
         const AndroidNotificationChannel(
           'weather_channel',
