@@ -86,45 +86,118 @@ class WeatherService {
     final longitude = lon ?? _defaultLon;
     String? lastError;
 
-    for (int attempt = 0; attempt < 3; attempt++) {
-      for (final protocol in ['https', 'http']) {
-        try {
-          final response = await http.get(
-            Uri.parse(
-                '$protocol://api.open-meteo.com/v1/forecast'
-                '?latitude=$latitude&longitude=$longitude'
-                '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code'
-                '&timezone=Africa/Khartoum'),
-          ).timeout(const Duration(seconds: 12));
-
-          if (response.statusCode == 200) {
-            final data = jsonDecode(response.body);
-            final current = data['current'];
-            final code = current['weather_code'] ?? 0;
-
-            return WeatherData(
-              temperature: (current['temperature_2m'] ?? 0).toDouble(),
-              humidity: (current['relative_humidity_2m'] ?? 0).toDouble(),
-              windSpeed: (current['wind_speed_10m'] ?? 0).toDouble(),
-              weatherCode: code,
-              description: _getWeatherDescription(code),
-            );
-          }
-          lastError = 'الخادم أعاد رمز ${response.statusCode}';
-        } catch (e) {
-          lastError = e is TimeoutException
-              ? 'انتهت مهلة الاتصال'
-              : e.toString();
-        }
+    for (final protocol in ['https', 'http']) {
+      try {
+        final result = await _fetchOpenMeteo(
+                protocol: protocol, lat: latitude, lon: longitude)
+            .timeout(const Duration(seconds: 12));
+        if (result != null) return result;
+      } catch (e) {
+        lastError = e.toString();
       }
+    }
 
-      if (attempt < 2) {
-        await Future.delayed(const Duration(seconds: 2));
+    for (final protocol in ['https', 'http']) {
+      try {
+        final result = await _fetchWttrIn(
+                protocol: protocol, lat: latitude, lon: longitude)
+            .timeout(const Duration(seconds: 12));
+        if (result != null) return result;
+      } catch (e) {
+        lastError = e.toString();
       }
     }
 
     debugPrint('WeatherService: جميع المحاولات فشلت - $lastError');
     return null;
+  }
+
+  static Future<WeatherData?> _fetchOpenMeteo({
+    required String protocol,
+    required double lat,
+    required double lon,
+  }) async {
+    final response = await http.get(
+      Uri.parse(
+          '$protocol://api.open-meteo.com/v1/forecast'
+          '?latitude=$lat&longitude=$lon'
+          '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code'
+          '&timezone=Africa/Khartoum'),
+    );
+
+    if (response.statusCode != 200) return null;
+    final data = jsonDecode(response.body);
+    final current = data['current'];
+    if (current == null) return null;
+    final code = current['weather_code'] ?? 0;
+
+    return WeatherData(
+      temperature: (current['temperature_2m'] ?? 0).toDouble(),
+      humidity: (current['relative_humidity_2m'] ?? 0).toDouble(),
+      windSpeed: (current['wind_speed_10m'] ?? 0).toDouble(),
+      weatherCode: code,
+      description: _getWeatherDescription(code),
+    );
+  }
+
+  static Future<WeatherData?> _fetchWttrIn({
+    required String protocol,
+    required double lat,
+    required double lon,
+  }) async {
+    final response = await http.get(
+      Uri.parse('$protocol://wttr.in/$lat,$lon?format=j1'),
+    );
+
+    if (response.statusCode != 200) return null;
+    final data = jsonDecode(response.body);
+    final current = data['current_condition'];
+    if (current == null || current.isEmpty) return null;
+    final c = current[0];
+
+    final temp = num.tryParse('${c['temp_C'] ?? '0'}')?.toDouble() ?? 0;
+    final humidity =
+        num.tryParse('${c['humidity'] ?? '0'}')?.toDouble() ?? 0;
+    final wind = num.tryParse('${c['windspeedKmph'] ?? '0'}')?.toDouble() ?? 0;
+    final code = int.tryParse('${c['weatherCode'] ?? '0'}') ?? 0;
+
+    return WeatherData(
+      temperature: temp,
+      humidity: humidity,
+      windSpeed: wind,
+      weatherCode: _mapWttrCode(code),
+      description: _getWeatherDescription(_mapWttrCode(code)),
+    );
+  }
+
+  static int _mapWttrCode(int code) {
+    switch (code) {
+      case 113: return 0;
+      case 116: return 2;
+      case 119:
+      case 122: return 3;
+      case 143: return 45;
+      case 176:
+      case 263:
+      case 266:
+      case 293:
+      case 296:
+      case 299:
+      case 302:
+      case 305:
+      case 308:
+      case 353:
+      case 356:
+      case 359: return 61;
+      case 200:
+      case 386:
+      case 389:
+      case 392:
+      case 395: return 95;
+      case 248:
+      case 260: return 45;
+      default: return 3;
+    }
   }
 
   static Future<void> checkWeatherAlert(WeatherData weather) async {
