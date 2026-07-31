@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:adhan_dart/adhan_dart.dart';
 import '../services/notification_service.dart';
@@ -82,30 +84,46 @@ class WeatherService {
       {double? lat, double? lon}) async {
     final latitude = lat ?? _defaultLat;
     final longitude = lon ?? _defaultLon;
+    String? lastError;
 
-    try {
-      final response = await http.get(
-        Uri.parse(
-            'https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude'
-            '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code'
-            '&timezone=Africa/Khartoum'),
-      ).timeout(const Duration(seconds: 10));
+    for (int attempt = 0; attempt < 3; attempt++) {
+      for (final protocol in ['https', 'http']) {
+        try {
+          final response = await http.get(
+            Uri.parse(
+                '$protocol://api.open-meteo.com/v1/forecast'
+                '?latitude=$latitude&longitude=$longitude'
+                '&current=temperature_2m,relative_humidity_2m,wind_speed_10m,weather_code'
+                '&timezone=Africa/Khartoum'),
+          ).timeout(const Duration(seconds: 12));
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final current = data['current'];
-        final code = current['weather_code'] ?? 0;
+          if (response.statusCode == 200) {
+            final data = jsonDecode(response.body);
+            final current = data['current'];
+            final code = current['weather_code'] ?? 0;
 
-        return WeatherData(
-          temperature: (current['temperature_2m'] ?? 0).toDouble(),
-          humidity: (current['relative_humidity_2m'] ?? 0).toDouble(),
-          windSpeed: (current['wind_speed_10m'] ?? 0).toDouble(),
-          weatherCode: code,
-          description: _getWeatherDescription(code),
-        );
+            return WeatherData(
+              temperature: (current['temperature_2m'] ?? 0).toDouble(),
+              humidity: (current['relative_humidity_2m'] ?? 0).toDouble(),
+              windSpeed: (current['wind_speed_10m'] ?? 0).toDouble(),
+              weatherCode: code,
+              description: _getWeatherDescription(code),
+            );
+          }
+          lastError = 'الخادم أعاد رمز ${response.statusCode}';
+        } catch (e) {
+          lastError = e is TimeoutException
+              ? 'انتهت مهلة الاتصال'
+              : e.toString();
+        }
       }
-    } catch (_) {}
 
+      if (attempt < 2) {
+        await Future.delayed(const Duration(seconds: 2));
+      }
+    }
+
+    debugPrint('WeatherService: جميع المحاولات فشلت - $lastError');
     return null;
   }
 

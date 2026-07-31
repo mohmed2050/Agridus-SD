@@ -20,6 +20,29 @@ class NotificationService {
   int _vibration = 2;
   int _selectedSound = 0;
 
+  static final List<AndroidNotificationChannel> _prayerChannels = [
+    AndroidNotificationChannel('prayer_0', 'مواقيت الصلاة (افتراضي)',
+        description: 'إشعارات مواقيت الصلاة',
+        importance: Importance.high, playSound: true),
+    AndroidNotificationChannel('prayer_1', 'مواقيت الصلاة (أذان الفجر)',
+        description: 'إشعارات مواقيت الصلاة',
+        importance: Importance.high, playSound: true,
+        sound: RawResourceAndroidNotificationSound('azan_fajr')),
+    AndroidNotificationChannel('prayer_2', 'مواقيت الصلاة (أذان عادي)',
+        description: 'إشعارات مواقيت الصلاة',
+        importance: Importance.high, playSound: true,
+        sound: RawResourceAndroidNotificationSound('azan_normal')),
+    AndroidNotificationChannel('prayer_3', 'مواقيت الصلاة (صوت إسلامي)',
+        description: 'إشعارات مواقيت الصلاة',
+        importance: Importance.high, playSound: true,
+        sound: RawResourceAndroidNotificationSound('notification_islamic')),
+    AndroidNotificationChannel('prayer_4', 'مواقيت الصلاة (صامت)',
+        description: 'إشعارات مواقيت الصلاة',
+        importance: Importance.high, playSound: false),
+  ];
+
+  String get _prayerChannelId => 'prayer_$_selectedSound';
+
   void updateSettings({
     required bool globalEnabled,
     required bool prayerEnabled,
@@ -38,46 +61,25 @@ class NotificationService {
 
   void setSelectedSound(int index) {
     _selectedSound = index;
-    _recreatePrayerChannel();
   }
 
   AndroidNotificationDetails _soundDetails(String channelId, String channelName) {
+    final sound = switch (_selectedSound) {
+      1 => const RawResourceAndroidNotificationSound('azan_fajr'),
+      2 => const RawResourceAndroidNotificationSound('azan_normal'),
+      3 => const RawResourceAndroidNotificationSound('notification_islamic'),
+      4 => null,
+      _ => null,
+    };
     return AndroidNotificationDetails(
       channelId,
       channelName,
       importance: Importance.high,
       priority: Priority.high,
       vibrationPattern: _getVibrationPattern(),
-      sound: _selectedSound == 0 ? null : _getNotificationSound(),
+      playSound: _selectedSound != 4,
+      sound: sound,
     );
-  }
-
-  RawResourceAndroidNotificationSound? _getNotificationSound() {
-    switch (_selectedSound) {
-      case 1: return const RawResourceAndroidNotificationSound('azan_fajr');
-      case 2: return const RawResourceAndroidNotificationSound('azan_normal');
-      case 3: return const RawResourceAndroidNotificationSound('notification_islamic');
-      default: return null;
-    }
-  }
-
-  void _recreatePrayerChannel() {
-    try {
-      final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      if (androidPlugin == null) return;
-      androidPlugin.deleteNotificationChannel('prayer_channel');
-      androidPlugin.createNotificationChannel(
-        AndroidNotificationChannel(
-          'prayer_channel',
-          'مواقيت الصلاة',
-          description: 'إشعارات مواقيت الصلاة',
-          importance: Importance.high,
-          playSound: _selectedSound != 4,
-          sound: _getNotificationSound(),
-        ),
-      );
-    } catch (_) {}
   }
 
   Future<void> init() async {
@@ -103,6 +105,9 @@ class NotificationService {
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
+      try {
+        await androidPlugin.requestNotificationsPermission();
+      } catch (_) {}
       await androidPlugin.createNotificationChannel(
         const AndroidNotificationChannel(
           'weather_channel',
@@ -112,16 +117,9 @@ class NotificationService {
           playSound: true,
         ),
       );
-      await androidPlugin.createNotificationChannel(
-        AndroidNotificationChannel(
-          'prayer_channel',
-          'مواقيت الصلاة',
-          description: 'إشعارات مواقيت الصلاة',
-          importance: Importance.high,
-          playSound: _selectedSound != 4,
-          sound: _getNotificationSound(),
-        ),
-      );
+      for (final ch in _prayerChannels) {
+        await androidPlugin.createNotificationChannel(ch);
+      }
       await androidPlugin.createNotificationChannel(
         const AndroidNotificationChannel(
           'task_channel',
@@ -155,7 +153,14 @@ class NotificationService {
     if (!_globalEnabled || !_prayerEnabled) return;
     await _show(2000 + prayerName.hashCode, 'حان الآن وقت صلاة $prayerName',
         'حان وقت صلاة $prayerName - لا تنسَ ذكر الله',
-        'prayer_channel', 'مواقيت الصلاة');
+        _prayerChannelId, 'مواقيت الصلاة');
+  }
+
+  Future<void> testPrayerNotification() async {
+    if (!_globalEnabled) return;
+    await _show(9999, 'اختبار صوت الإشعار',
+        'إذا سمعت هذا الصوت فكل شيء يعمل بشكل صحيح',
+        _prayerChannelId, 'مواقيت الصلاة');
   }
 
   Future<void> showTaskNotification(String title) async {
@@ -210,7 +215,7 @@ class NotificationService {
       'حان وقت صلاة $prayerName',
       tz.TZDateTime.from(scheduledDate, tz.local),
       NotificationDetails(
-        android: _soundDetails('prayer_channel', 'مواقيت الصلاة'),
+        android: _soundDetails(_prayerChannelId, 'مواقيت الصلاة'),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,

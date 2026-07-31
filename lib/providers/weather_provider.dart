@@ -22,32 +22,33 @@ class WeatherProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
+    await Future.any([
+      _doLoad(),
+      Future.delayed(const Duration(seconds: 20)),
+    ]);
+
+    _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> _doLoad() async {
     try {
-      await _requestLocation().timeout(const Duration(seconds: 10));
+      await _requestLocation().timeout(const Duration(seconds: 8));
     } catch (_) {}
 
     try {
       _weather = await WeatherService
           .fetchWeather(lat: _lat, lon: _lon)
-          .timeout(const Duration(seconds: 15));
+          .timeout(const Duration(seconds: 12));
     } catch (_) {}
 
     _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);
 
-    if (_weather != null) {
-      try {
-        await WeatherService.checkWeatherAlert(_weather!);
-      } catch (_) {}
-    }
-
     try {
       await WeatherService
           .schedulePrayerNotifications(lat: _lat, lon: _lon)
-          .timeout(const Duration(seconds: 10));
+          .timeout(const Duration(seconds: 8));
     } catch (_) {}
-
-    _isLoading = false;
-    notifyListeners();
   }
 
   Future<void> _requestLocation() async {

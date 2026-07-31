@@ -159,6 +159,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           _sectionHeader('إعدادات الصوت', Icons.music_note),
           Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Text(
+              'بعد اختيار الصوت، اضغط "اختبار الإشعار" للتأكد من عمله',
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.volume_up),
+                label: const Text('اختبار صوت الإشعار'),
+                onPressed: () async {
+                  _syncNotificationSettings();
+                  try {
+                    await NotificationService().testPrayerNotification();
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('تم إرسال إشعار اختبار - هل سمعت الصوت؟')));
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('فشل الإشعار: $e')));
+                    }
+                  }
+                },
+              ),
+            ),
+          ),
+          Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: InputDecorator(
               decoration: const InputDecoration(
