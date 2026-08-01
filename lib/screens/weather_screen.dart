@@ -118,6 +118,15 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   'تعذر تحميل بيانات الطقس',
                   style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
+                if (provider.error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    provider.error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: Colors.white54, fontSize: 12),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 32,

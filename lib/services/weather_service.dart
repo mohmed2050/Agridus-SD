@@ -90,7 +90,7 @@ class WeatherService {
       try {
         final result = await _fetchOpenMeteo(
                 protocol: protocol, lat: latitude, lon: longitude)
-            .timeout(const Duration(seconds: 12));
+            .timeout(const Duration(seconds: 6));
         if (result != null) return result;
       } catch (e) {
         lastError = e.toString();
@@ -101,7 +101,7 @@ class WeatherService {
       try {
         final result = await _fetchWttrIn(
                 protocol: protocol, lat: latitude, lon: longitude)
-            .timeout(const Duration(seconds: 12));
+            .timeout(const Duration(seconds: 6));
         if (result != null) return result;
       } catch (e) {
         lastError = e.toString();

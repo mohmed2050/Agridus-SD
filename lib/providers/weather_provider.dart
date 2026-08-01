@@ -23,11 +23,11 @@ class WeatherProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await Future.any([
-        _doLoad(),
-        Future.delayed(const Duration(seconds: 25)),
-      ]);
-    } catch (_) {}
+      await _doLoad().timeout(const Duration(seconds: 20));
+    } catch (e) {
+      _error = 'انتهت مهلة تحميل البيانات';
+      debugPrint('WeatherProvider: timeout - $e');
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -36,23 +36,35 @@ class WeatherProvider extends ChangeNotifier {
   Future<void> _doLoad() async {
     try {
       await _requestLocation().timeout(const Duration(seconds: 8));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('WeatherProvider: فشل تحديد الموقع - $e');
+    }
 
     try {
       _weather = await WeatherService
           .fetchWeather(lat: _lat, lon: _lon)
-          .timeout(const Duration(seconds: 12));
-    } catch (_) {}
+          .timeout(const Duration(seconds: 14));
+      if (_weather == null) {
+        _error = 'تعذر الاتصال بخادم الطقس - تحقق من اتصال الإنترنت';
+      }
+    } catch (e) {
+      _error = 'فشل تحميل الطقس: $e';
+      debugPrint('WeatherProvider: $_error');
+    }
 
     try {
       _prayerTimes = WeatherService.calculatePrayerTimes(lat: _lat, lon: _lon);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('WeatherProvider: فشل حساب المواقيت - $e');
+    }
 
     try {
       await WeatherService
           .schedulePrayerNotifications(lat: _lat, lon: _lon)
           .timeout(const Duration(seconds: 8));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('WeatherProvider: فشل جدولة الإشعارات - $e');
+    }
   }
 
   Future<void> _requestLocation() async {
