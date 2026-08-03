@@ -42,6 +42,8 @@ class PrayerTimeData {
 class WeatherService {
   static const double _defaultLat = 15.5007;
   static const double _defaultLon = 32.5599;
+  static double _lastLat = _defaultLat;
+  static double _lastLon = _defaultLon;
 
   static String _getWeatherDescription(int code) {
     switch (code) {
@@ -255,8 +257,10 @@ class WeatherService {
     double? lat,
     double? lon,
   }) async {
-    final latitude = lat ?? _defaultLat;
-    final longitude = lon ?? _defaultLon;
+    final latitude = lat ?? _lastLat;
+    final longitude = lon ?? _lastLon;
+    _lastLat = latitude;
+    _lastLon = longitude;
     final now = DateTime.now();
 
     final coordinates = Coordinates(latitude, longitude);
@@ -278,10 +282,8 @@ class WeatherService {
 
     int id = 3000;
     for (final entry in prayers.entries) {
-      final notificationTime =
-          entry.value.subtract(const Duration(minutes: 10));
       await NotificationService()
-          .schedulePrayerNotification(id++, entry.key, notificationTime);
+          .schedulePrayerNotification(id++, entry.key, entry.value);
     }
   }
 }

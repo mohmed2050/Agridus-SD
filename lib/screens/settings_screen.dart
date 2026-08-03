@@ -70,7 +70,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildSystemStatus(AppProvider p) {
-    final allOk = p.notificationsEnabled;
+    final permissionOk = NotificationService().notificationsPermissionGranted;
+    final allOk = p.notificationsEnabled && permissionOk;
     return Card(
       color: allOk ? Colors.green.shade50 : Colors.red.shade50,
       child: Padding(
@@ -89,6 +90,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _statusRow('الإشعارات',
                 p.notificationsEnabled ? 'مفعلة' : 'معطلة',
                 p.notificationsEnabled),
+            _statusRow('إذن النظام',
+                permissionOk ? 'ممنوح' : 'مرفوض',
+                permissionOk),
+            if (!permissionOk)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'إذن إرسال الإشعارات مرفوض من النظام - فعّله من إعدادات التطبيق حتى تعمل إشعارات الأذان',
+                  style: TextStyle(fontSize: 12, color: Colors.red[700]),
+                ),
+              ),
             _statusRow('الصوت', p.selectedSoundName, true),
             _statusRow('الاهتزاز', p.vibrationLabel, true),
           ],

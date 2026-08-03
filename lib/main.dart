@@ -10,6 +10,7 @@ import 'providers/calendar_provider.dart';
 import 'providers/guide_provider.dart';
 import 'providers/market_provider.dart';
 import 'services/notification_service.dart';
+import 'services/weather_service.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -17,6 +18,11 @@ void main() async {
   await NotificationService().init();
   final appProvider = AppProvider();
   await appProvider.loadAll();
+  try {
+    await WeatherService.schedulePrayerNotifications();
+  } catch (e) {
+    debugPrint('main: فشل جدولة إشعارات الصلاة عند بدء التشغيل - $e');
+  }
   runApp(AgridusApp(appProvider: appProvider));
 }
 

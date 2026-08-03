@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -11,6 +11,9 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool _permissionGranted = true;
+
+  bool get notificationsPermissionGranted => _permissionGranted;
 
   bool _globalEnabled = true;
   bool _prayerEnabled = true;
@@ -63,21 +66,25 @@ class NotificationService {
     _selectedSound = index;
   }
 
-  AndroidNotificationDetails _soundDetails(String channelId, String channelName) {
-    final sound = switch (_selectedSound) {
-      1 => const RawResourceAndroidNotificationSound('azan_fajr'),
-      2 => const RawResourceAndroidNotificationSound('azan_normal'),
-      3 => const RawResourceAndroidNotificationSound('notification_islamic'),
-      4 => null,
-      _ => null,
-    };
+  AndroidNotificationDetails _details(
+      String channelId, String channelName,
+      {bool usePrayerSound = false}) {
+    final sound = usePrayerSound
+        ? switch (_selectedSound) {
+            1 => const RawResourceAndroidNotificationSound('azan_fajr'),
+            2 => const RawResourceAndroidNotificationSound('azan_normal'),
+            3 => const RawResourceAndroidNotificationSound('notification_islamic'),
+            _ => null,
+          }
+        : null;
+    final isSilent = usePrayerSound && _selectedSound == 4;
     return AndroidNotificationDetails(
       channelId,
       channelName,
       importance: Importance.high,
       priority: Priority.high,
       vibrationPattern: _getVibrationPattern(),
-      playSound: _selectedSound != 4,
+      playSound: !isSilent,
       sound: sound,
     );
   }
@@ -106,7 +113,10 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       try {
-        await androidPlugin.requestNotificationsPermission();
+        final granted = await androidPlugin.requestNotificationsPermission();
+        _permissionGranted = granted ?? true;
+        debugPrint(
+            'NotificationService: إذن الإشعارات = $_permissionGranted');
       } catch (_) {}
       for (final ch in _prayerChannels) {
         try {
@@ -158,14 +168,14 @@ class NotificationService {
     if (!_globalEnabled || !_prayerEnabled) return;
     await _show(2000 + prayerName.hashCode, 'حان الآن وقت صلاة $prayerName',
         'حان وقت صلاة $prayerName - لا تنسَ ذكر الله',
-        _prayerChannelId, 'مواقيت الصلاة');
+        _prayerChannelId, 'مواقيت الصلاة', usePrayerSound: true);
   }
 
   Future<void> testPrayerNotification() async {
     if (!_globalEnabled) return;
     await _show(9999, 'اختبار صوت الإشعار',
         'إذا سمعت هذا الصوت فكل شيء يعمل بشكل صحيح',
-        _prayerChannelId, 'مواقيت الصلاة');
+        _prayerChannelId, 'مواقيت الصلاة', usePrayerSound: true);
   }
 
   Future<void> showTaskNotification(String title) async {
@@ -181,13 +191,15 @@ class NotificationService {
   }
 
   Future<void> _show(int id, String title, String body,
-      String channelId, String channelName) async {
+      String channelId, String channelName,
+      {bool usePrayerSound = false}) async {
     await _plugin.show(
       id,
       title,
       body,
       NotificationDetails(
-        android: _soundDetails(channelId, channelName),
+        android:
+            _details(channelId, channelName, usePrayerSound: usePrayerSound),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
@@ -220,7 +232,8 @@ class NotificationService {
       'حان وقت صلاة $prayerName',
       tz.TZDateTime.from(scheduledDate, tz.local),
       NotificationDetails(
-        android: _soundDetails(_prayerChannelId, 'مواقيت الصلاة'),
+        android: _details(_prayerChannelId, 'مواقيت الصلاة',
+            usePrayerSound: true),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,
@@ -242,7 +255,7 @@ class NotificationService {
       'حان وقت تنفيذ المهمة',
       tz.TZDateTime.from(time, tz.local),
       NotificationDetails(
-        android: _soundDetails('task_channel', 'تنبيهات المهام'),
+        android: _details('task_channel', 'تنبيهات المهام'),
         iOS: const DarwinNotificationDetails(
           presentAlert: true,
           presentSound: true,

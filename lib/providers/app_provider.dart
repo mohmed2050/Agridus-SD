@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/notification_service.dart';
+import '../services/weather_service.dart';
 
 class AppProvider extends ChangeNotifier {
   int _currentTabIndex = 0;
@@ -122,6 +123,11 @@ class AppProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('selected_sound', index);
     NotificationService().setSelectedSound(index);
+    try {
+      await WeatherService.schedulePrayerNotifications();
+    } catch (e) {
+      debugPrint('AppProvider: فشل إعادة جدولة إشعارات الصلاة - $e');
+    }
     notifyListeners();
   }
 
