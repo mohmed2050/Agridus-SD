@@ -73,7 +73,19 @@ class AppProvider extends ChangeNotifier {
     _vibrationIntensity = prefs.getInt('vibration_intensity') ?? 2;
     _fontScale = prefs.getDouble('font_scale') ?? 1.0;
     NotificationService().setSelectedSound(_selectedSoundIndex);
+    _pushNotificationSettings();
     notifyListeners();
+  }
+
+  void _pushNotificationSettings() {
+    NotificationService().updateSettings(
+      globalEnabled: _notificationsEnabled,
+      prayerEnabled: _prayerAlertsEnabled,
+      weatherEnabled: _weatherAlertsEnabled,
+      taskEnabled: _taskAlertsEnabled,
+      calendarEnabled: _calendarAlertsEnabled,
+      vibrationIntensity: _vibrationIntensity,
+    );
   }
 
   Future<void> toggleDarkMode() async {
@@ -87,6 +99,7 @@ class AppProvider extends ChangeNotifier {
     _notificationsEnabled = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('notifications_enabled', v);
+    _pushNotificationSettings();
     notifyListeners();
   }
 
@@ -94,6 +107,7 @@ class AppProvider extends ChangeNotifier {
     _prayerAlertsEnabled = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('prayer_alerts_enabled', v);
+    _pushNotificationSettings();
     notifyListeners();
   }
 
@@ -101,6 +115,7 @@ class AppProvider extends ChangeNotifier {
     _weatherAlertsEnabled = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('weather_alerts_enabled', v);
+    _pushNotificationSettings();
     notifyListeners();
   }
 
@@ -108,6 +123,7 @@ class AppProvider extends ChangeNotifier {
     _taskAlertsEnabled = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('task_alerts_enabled', v);
+    _pushNotificationSettings();
     notifyListeners();
   }
 
@@ -115,6 +131,7 @@ class AppProvider extends ChangeNotifier {
     _calendarAlertsEnabled = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('calendar_alerts_enabled', v);
+    _pushNotificationSettings();
     notifyListeners();
   }
 
@@ -135,6 +152,7 @@ class AppProvider extends ChangeNotifier {
     _vibrationIntensity = v;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt('vibration_intensity', v);
+    _pushNotificationSettings();
     notifyListeners();
   }
 

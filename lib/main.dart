@@ -19,6 +19,7 @@ void main() async {
   final appProvider = AppProvider();
   await appProvider.loadAll();
   try {
+    await WeatherService.restoreLastLocation();
     await WeatherService.schedulePrayerNotifications();
   } catch (e) {
     debugPrint('main: فشل جدولة إشعارات الصلاة عند بدء التشغيل - $e');

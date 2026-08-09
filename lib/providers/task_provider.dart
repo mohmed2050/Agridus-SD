@@ -75,7 +75,9 @@ class TaskProvider extends ChangeNotifier {
       final db = DatabaseService();
       final rows = await db.query('tasks', orderBy: 'created_at DESC');
       _tasks = rows.map((r) => TaskItem.fromMap(r)).toList();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('TaskProvider: فشل تحميل المهام - $e');
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -89,7 +91,7 @@ class TaskProvider extends ChangeNotifier {
     notifyListeners();
 
     if (task.alertTime != null) {
-      NotificationService()
+      await NotificationService()
           .scheduleTaskNotification(id, task.title, task.alertTime!);
     }
   }
@@ -107,7 +109,8 @@ class TaskProvider extends ChangeNotifier {
     _tasks[index] = task.copyWith(isCompleted: newStatus);
 
     if (newStatus) {
-      await NotificationService().cancelNotification(taskId);
+      await NotificationService()
+          .cancelNotification(NotificationService.taskNotificationId(taskId));
     }
 
     notifyListeners();
@@ -117,7 +120,8 @@ class TaskProvider extends ChangeNotifier {
     final db = DatabaseService();
     await db.delete('tasks', where: 'id = ?', whereArgs: [taskId]);
     _tasks.removeWhere((t) => t.id == taskId);
-    await NotificationService().cancelNotification(taskId);
+    await NotificationService()
+        .cancelNotification(NotificationService.taskNotificationId(taskId));
     notifyListeners();
   }
 }

@@ -10,6 +10,7 @@ class CalendarProvider extends ChangeNotifier {
   int? _selectedCropId;
   bool _isLoading = false;
   bool _isSeeded = false;
+  Future<void>? _seedFuture;
 
   List<CalendarEntry> get entries => _entries;
   List<CalendarAlert> get alerts => _alerts;
@@ -46,19 +47,24 @@ class CalendarProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final db = DatabaseService();
-    final rows = await db.query('calendar', orderBy: 'crop_id ASC');
-    if (rows.isEmpty && !_isSeeded) {
-      await _seedData();
-      final seeded = await db.query('calendar', orderBy: 'crop_id ASC');
-      _entries = seeded.map((r) => CalendarEntry.fromMap(r)).toList();
-      _isSeeded = true;
-    } else {
-      _entries = rows.map((r) => CalendarEntry.fromMap(r)).toList();
-    }
+    try {
+      final db = DatabaseService();
+      final rows = await db.query('calendar', orderBy: 'crop_id ASC');
+      if (rows.isEmpty && !_isSeeded) {
+        await _seedData();
+        _isSeeded = true;
+        final seeded = await db.query('calendar', orderBy: 'crop_id ASC');
+        _entries = seeded.map((r) => CalendarEntry.fromMap(r)).toList();
+      } else {
+        _entries = rows.map((r) => CalendarEntry.fromMap(r)).toList();
+      }
 
-    final alertRows = await db.query('calendar_alerts', orderBy: 'crop_id ASC');
-    _alerts = alertRows.map((r) => CalendarAlert.fromMap(r)).toList();
+      final alertRows =
+          await db.query('calendar_alerts', orderBy: 'crop_id ASC');
+      _alerts = alertRows.map((r) => CalendarAlert.fromMap(r)).toList();
+    } catch (e) {
+      debugPrint('CalendarProvider: فشل تحميل التقويم - $e');
+    }
 
     _isLoading = false;
     notifyListeners();
@@ -87,7 +93,8 @@ class CalendarProvider extends ChangeNotifier {
     _alerts[index] = alert.copyWith(enabled: newStatus);
 
     if (!newStatus && alert.taskId != null) {
-      await NotificationService().cancelNotification(alert.taskId!);
+      await NotificationService()
+          .cancelNotification(NotificationService.taskNotificationId(alert.taskId!));
     }
 
     notifyListeners();
@@ -129,7 +136,8 @@ class CalendarProvider extends ChangeNotifier {
         });
 
         if (alertDate.isAfter(DateTime.now())) {
-          NotificationService().scheduleTaskNotification(taskId, a['title'] as String, alertDate);
+          await NotificationService()
+              .scheduleCalendarNotification(taskId, a['title'] as String, alertDate);
         }
 
         final alert = CalendarAlert(
@@ -154,7 +162,8 @@ class CalendarProvider extends ChangeNotifier {
     for (final alert in toDelete) {
       if (alert.taskId != null) {
         await db.delete('tasks', where: 'id = ?', whereArgs: [alert.taskId]);
-        await NotificationService().cancelNotification(alert.taskId!);
+        await NotificationService()
+            .cancelNotification(NotificationService.taskNotificationId(alert.taskId!));
       }
       await db.delete('calendar_alerts', where: 'id = ?', whereArgs: [alert.id]);
     }
@@ -198,7 +207,16 @@ class CalendarProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _seedData() async {
+  Future<void> _seedData() {
+    return _seedFuture ??= _doSeed();
+  }
+
+  void resetSeedState() {
+    _seedFuture = null;
+    _isSeeded = false;
+  }
+
+  Future<void> _doSeed() async {
     final db = DatabaseService();
     final data = _getSeedData();
     for (final entry in data) {

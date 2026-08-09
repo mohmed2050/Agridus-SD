@@ -35,6 +35,12 @@ class WeatherProvider extends ChangeNotifier {
 
   Future<void> _doLoad() async {
     try {
+      await WeatherService.restoreLastLocation();
+    } catch (e) {
+      debugPrint('WeatherProvider: فشل استعادة آخر موقع - $e');
+    }
+
+    try {
       await _requestLocation().timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('WeatherProvider: فشل تحديد الموقع - $e');
@@ -46,6 +52,8 @@ class WeatherProvider extends ChangeNotifier {
           .timeout(const Duration(seconds: 14));
       if (_weather == null) {
         _error = 'تعذر الاتصال بخادم الطقس - تحقق من اتصال الإنترنت';
+      } else {
+        await WeatherService.checkWeatherAlert(_weather!);
       }
     } catch (e) {
       _error = 'فشل تحميل الطقس: $e';
@@ -86,6 +94,7 @@ class WeatherProvider extends ChangeNotifier {
           _lat = locData.latitude!;
           _lon = locData.longitude!;
           _hasLocation = true;
+          await WeatherService.saveLastLocation(_lat, _lon);
         }
       }
     } catch (_) {}

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -7,6 +8,9 @@ class DatabaseService {
   DatabaseService._internal();
 
   Database? _database;
+
+  Future<String> _dbFilePath() async =>
+      join(await getDatabasesPath(), 'agridus.db');
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -22,6 +26,42 @@ class DatabaseService {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  Future<Database?> closeDatabase() async {
+    final db = _database;
+    _database = null;
+    if (db != null && db.isOpen) await db.close();
+    return db;
+  }
+
+  Future<String> backupTo(String destPath) async {
+    final src = File(await _dbFilePath());
+    if (!await src.exists()) {
+      throw FileSystemException('لا توجد قاعدة بيانات للنسخ', src.path);
+    }
+    await closeDatabase();
+    try {
+      await src.copy(destPath);
+    } finally {
+      await database;
+    }
+    return destPath;
+  }
+
+  Future<void> restoreFrom(String srcPath) async {
+    await closeDatabase();
+    await File(srcPath).copy(await _dbFilePath());
+    await database;
+  }
+
+  Future<void> clearAllData() async {
+    final dest = File(await _dbFilePath());
+    await closeDatabase();
+    if (await dest.exists()) {
+      await dest.delete();
+    }
+    await database;
   }
 
   Future<void> _onCreate(Database db, int version) async {

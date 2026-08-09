@@ -8,6 +8,7 @@ class MarketProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _isSeeded = false;
   int? _selectedCropId;
+  Future<void>? _seedFuture;
 
   List<MarketPrice> get prices => _prices;
   bool get isLoading => _isLoading;
@@ -48,23 +49,37 @@ class MarketProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final db = DatabaseService();
-    final rows = await db.query('market_prices', orderBy: 'market_name ASC');
+    try {
+      final db = DatabaseService();
+      final rows = await db.query('market_prices', orderBy: 'market_name ASC');
 
-    if (rows.isEmpty && !_isSeeded) {
-      await _seedData();
-      final seeded = await db.query('market_prices', orderBy: 'market_name ASC');
-      _prices = seeded.map((r) => MarketPrice.fromMap(r)).toList();
-      _isSeeded = true;
-    } else {
-      _prices = rows.map((r) => MarketPrice.fromMap(r)).toList();
+      if (rows.isEmpty && !_isSeeded) {
+        await _seedData();
+        _isSeeded = true;
+        final seeded =
+            await db.query('market_prices', orderBy: 'market_name ASC');
+        _prices = seeded.map((r) => MarketPrice.fromMap(r)).toList();
+      } else {
+        _prices = rows.map((r) => MarketPrice.fromMap(r)).toList();
+      }
+    } catch (e) {
+      debugPrint('MarketProvider: فشل تحميل الأسعار - $e');
     }
 
     _isLoading = false;
     notifyListeners();
   }
 
-  Future<void> _seedData() async {
+  Future<void> _seedData() {
+    return _seedFuture ??= _doSeed();
+  }
+
+  void resetSeedState() {
+    _seedFuture = null;
+    _isSeeded = false;
+  }
+
+  Future<void> _doSeed() async {
     final db = DatabaseService();
     final rng = Random(42);
     const markets = ['الخرطوم', 'ود مدني', 'بورتسودان', 'الأبيض', 'كسلا'];

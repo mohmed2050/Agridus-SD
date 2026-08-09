@@ -85,9 +85,32 @@ class _NewsScreenState extends State<NewsScreen> {
       onRefresh: () => provider.loadNews(),
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
-        itemCount: provider.articles.length,
+        itemCount: provider.articles.length + (provider.isOffline ? 1 : 0),
         itemBuilder: (context, index) {
-          final article = provider.articles[index];
+          if (provider.isOffline && index == 0) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade300),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.wifi_off, color: Colors.orange, size: 18),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'لا يوجد اتصال بالإنترنت - يتم عرض آخر الأخبار المخزنة',
+                      style: TextStyle(fontSize: 13, color: Colors.orange),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final article = provider.articles[index - (provider.isOffline ? 1 : 0)];
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             shape:

@@ -8,9 +8,14 @@ import 'calendar_screen.dart';
 import 'tasks_screen.dart';
 import 'settings_screen.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _screens = const [
     CropsScreen(),
     NewsScreen(),
@@ -20,12 +25,23 @@ class HomeScreen extends StatelessWidget {
     SettingsScreen(),
   ];
 
+  final Set<int> _visitedTabs = {0};
+
   @override
   Widget build(BuildContext context) {
     return Consumer<AppProvider>(
       builder: (context, provider, child) {
+        if (!_visitedTabs.contains(provider.currentTabIndex)) {
+          _visitedTabs.add(provider.currentTabIndex);
+        }
         return Scaffold(
-          body: _screens[provider.currentTabIndex],
+          body: IndexedStack(
+            index: provider.currentTabIndex,
+            children: [
+              for (var i = 0; i < _screens.length; i++)
+                _visitedTabs.contains(i) ? _screens[i] : const SizedBox.shrink(),
+            ],
+          ),
           bottomNavigationBar: BottomNavigationBar(
             currentIndex: provider.currentTabIndex,
             onTap: (index) => provider.setTabIndex(index),

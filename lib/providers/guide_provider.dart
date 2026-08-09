@@ -9,6 +9,7 @@ class GuideProvider extends ChangeNotifier {
   bool _isSeeded = false;
   String _searchQuery = '';
   int? _filterCropId;
+  Future<void>? _seedFuture;
 
   List<Pesticide> get pesticides => _pesticides;
   List<Fertilizer> get fertilizers => _fertilizers;
@@ -54,19 +55,19 @@ class GuideProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final db = DatabaseService();
-    final pRows = await db.query('pesticides', orderBy: 'trade_name ASC');
-    if (pRows.isEmpty && !_isSeeded) {
-      await _seedData();
+    try {
+      final db = DatabaseService();
+      final pRows = await db.query('pesticides', orderBy: 'trade_name ASC');
+      if (pRows.isEmpty && !_isSeeded) {
+        await _seedData();
+        _isSeeded = true;
+      }
       final p2 = await db.query('pesticides', orderBy: 'trade_name ASC');
       final f2 = await db.query('fertilizers', orderBy: 'trade_name ASC');
       _pesticides = p2.map((r) => Pesticide.fromMap(r)).toList();
       _fertilizers = f2.map((r) => Fertilizer.fromMap(r)).toList();
-      _isSeeded = true;
-    } else {
-      _pesticides = pRows.map((r) => Pesticide.fromMap(r)).toList();
-      final fRows = await db.query('fertilizers', orderBy: 'trade_name ASC');
-      _fertilizers = fRows.map((r) => Fertilizer.fromMap(r)).toList();
+    } catch (e) {
+      debugPrint('GuideProvider: فشل تحميل البيانات - $e');
     }
 
     _isLoading = false;
@@ -83,7 +84,16 @@ class GuideProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _seedData() async {
+  Future<void> _seedData() {
+    return _seedFuture ??= _doSeed();
+  }
+
+  void resetSeedState() {
+    _seedFuture = null;
+    _isSeeded = false;
+  }
+
+  Future<void> _doSeed() async {
     final db = DatabaseService();
     for (final p in _pesticideSeedData) {
       await db.insert('pesticides', p);

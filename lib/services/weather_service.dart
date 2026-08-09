@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:adhan_dart/adhan_dart.dart';
 import '../services/notification_service.dart';
 
@@ -44,6 +45,32 @@ class WeatherService {
   static const double _defaultLon = 32.5599;
   static double _lastLat = _defaultLat;
   static double _lastLon = _defaultLon;
+
+  static Future<void> saveLastLocation(double lat, double lon) async {
+    _lastLat = lat;
+    _lastLon = lon;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('last_lat', lat);
+      await prefs.setDouble('last_lon', lon);
+    } catch (e) {
+      debugPrint('WeatherService: فشل حفظ الموقع - $e');
+    }
+  }
+
+  static Future<void> restoreLastLocation() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lat = prefs.getDouble('last_lat');
+      final lon = prefs.getDouble('last_lon');
+      if (lat != null && lon != null) {
+        _lastLat = lat;
+        _lastLon = lon;
+      }
+    } catch (e) {
+      debugPrint('WeatherService: فشل استعادة الموقع - $e');
+    }
+  }
 
   static String _getWeatherDescription(int code) {
     switch (code) {
@@ -217,9 +244,17 @@ class WeatherService {
     }
 
     if (alert != null) {
-      await NotificationService().showWeatherAlert(alert);
+      final now = DateTime.now();
+      final today =
+          '${now.year}-${now.month}-${now.day}';
+      if (_lastAlertDate != today) {
+        _lastAlertDate = today;
+        await NotificationService().showWeatherAlert(alert);
+      }
     }
   }
+
+  static String _lastAlertDate = '';
 
   static PrayerTimeData calculatePrayerTimes({
     double? lat,
@@ -239,8 +274,8 @@ class WeatherService {
     );
 
     String format(DateTime dt) {
-      final khartoum = dt.add(const Duration(hours: 2));
-      return '${khartoum.hour.toString().padLeft(2, '0')}:${khartoum.minute.toString().padLeft(2, '0')}';
+      final local = dt.toLocal();
+      return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     }
 
     return PrayerTimeData(

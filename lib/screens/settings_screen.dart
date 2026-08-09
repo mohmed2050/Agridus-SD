@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite/sqflite.dart';
 import '../providers/app_provider.dart';
+import '../providers/crop_provider.dart';
+import '../providers/calendar_provider.dart';
+import '../providers/task_provider.dart';
+import '../providers/guide_provider.dart';
+import '../providers/market_provider.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 import '../services/audio_service.dart';
 import 'profit_calculator_screen.dart';
 import 'guide_screen.dart';
@@ -20,26 +25,6 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _syncNotificationSettings();
-    });
-  }
-
-  void _syncNotificationSettings() {
-    final p = context.read<AppProvider>();
-    NotificationService().updateSettings(
-      globalEnabled: p.notificationsEnabled,
-      prayerEnabled: p.prayerAlertsEnabled,
-      weatherEnabled: p.weatherAlertsEnabled,
-      taskEnabled: p.taskAlertsEnabled,
-      calendarEnabled: p.calendarAlertsEnabled,
-      vibrationIntensity: p.vibrationIntensity,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -134,28 +119,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSwitch('الإشعارات العامة',
               'تعطيل جميع الإشعارات', p.notificationsEnabled, (v) {
             p.setNotificationsEnabled(v);
-            _syncNotificationSettings();
           }),
           if (p.notificationsEnabled) ...[
             _buildSwitch('تنبيه الصلاة',
                 'إشعارات مواقيت الصلاة', p.prayerAlertsEnabled, (v) {
               p.setPrayerAlertsEnabled(v);
-              _syncNotificationSettings();
             }),
             _buildSwitch('تنبيه الطقس',
                 'إشعارات حالة الطقس', p.weatherAlertsEnabled, (v) {
               p.setWeatherAlertsEnabled(v);
-              _syncNotificationSettings();
             }),
             _buildSwitch('تنبيه المهام',
                 'إشعارات تذكير المهام', p.taskAlertsEnabled, (v) {
               p.setTaskAlertsEnabled(v);
-              _syncNotificationSettings();
             }),
             _buildSwitch('تنبيه التقويم الزراعي',
                 'إشعارات مواعيد الزراعة والحصاد', p.calendarAlertsEnabled, (v) {
               p.setCalendarAlertsEnabled(v);
-              _syncNotificationSettings();
             }),
           ],
         ],
@@ -185,18 +165,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 icon: const Icon(Icons.volume_up),
                 label: const Text('اختبار صوت الإشعار'),
                 onPressed: () async {
-                  _syncNotificationSettings();
+                  final messenger = ScaffoldMessenger.of(context);
                   try {
                     await NotificationService().testPrayerNotification();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('تم إرسال إشعار اختبار - هل سمعت الصوت؟')));
-                    }
+                    messenger.showSnackBar(
+                        const SnackBar(content: Text('تم إرسال إشعار اختبار - هل سمعت الصوت؟')));
                   } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('فشل الإشعار: $e')));
-                    }
+                    messenger.showSnackBar(
+                        SnackBar(content: Text('فشل الإشعار: $e')));
                   }
                 },
               ),
@@ -249,7 +225,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: p.vibrationLabel,
                   onChanged: (v) {
                     p.setVibrationIntensity(v.toInt());
-                    _syncNotificationSettings();
                     HapticFeedback.heavyImpact();
                   },
                 ),
@@ -348,7 +323,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontWeight: FontWeight.bold)),
           subtitle: const Text('تصدير قاعدة البيانات'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () => _backupData(context),
+          onTap: () => _backupData(),
         ),
         ListTile(
           leading: const CircleAvatar(child: Icon(Icons.restore)),
@@ -356,7 +331,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontWeight: FontWeight.bold)),
           subtitle: const Text('استيراد آخر نسخة احتياطية'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () => _restoreData(context),
+          onTap: () => _restoreData(),
         ),
         ListTile(
           leading: const CircleAvatar(
@@ -365,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
           subtitle: const Text('حذف قاعدة البيانات بالكامل'),
           trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-          onTap: () => _clearAllData(context),
+          onTap: () => _clearAllData(),
         ),
       ]),
     );
@@ -379,7 +354,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           title: const Text('Agridus-SD',
               style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: Text('الإصدار v3.0.0'),
+          subtitle: const Text('الإصدار 3.0.3'),
         ),
       ]),
     );
@@ -430,62 +405,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Future<void> _backupData(BuildContext context) async {
+  Future<void> _backupData() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final dbPath = await getDatabasesPath();
-      final dbFile = File('$dbPath/agridus.db');
-      if (!await dbFile.exists()) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('لا توجد قاعدة بيانات للنسخ')));
-        }
-        return;
-      }
       final dir = await getApplicationDocumentsDirectory();
       final backup = File('${dir.path}/agridus_backup_${DateTime.now().millisecondsSinceEpoch}.db');
-      await dbFile.copy(backup.path);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('تم النسخ الاحتياطي: ${backup.path}')));
-      }
+      await DatabaseService().backupTo(backup.path);
+      messenger.showSnackBar(
+          SnackBar(content: Text('تم النسخ الاحتياطي: ${backup.path}')));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل النسخ: $e')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('فشل النسخ: $e')));
     }
   }
 
-  Future<void> _restoreData(BuildContext context) async {
+  Future<void> _restoreData() async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
       final dir = await getApplicationDocumentsDirectory();
       final backups = await dir.list().where((e) =>
           e.path.endsWith('.db') && e.path.contains('agridus_backup')).toList();
       if (backups.isEmpty) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('لا توجد نسخ احتياطية')));
-        }
+        messenger.showSnackBar(
+            const SnackBar(content: Text('لا توجد نسخ احتياطية')));
         return;
       }
       backups.sort((a, b) => b.path.compareTo(a.path));
-      final dbPath = await getDatabasesPath();
-      final src = File(backups.first.path);
-      final dst = File('$dbPath/agridus.db');
-      await src.copy(dst.path);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تمت استعادة آخر نسخة')));
-      }
+      await DatabaseService().restoreFrom(backups.first.path);
+      if (!mounted) return;
+      await _reloadAllData();
+      messenger.showSnackBar(
+          const SnackBar(content: Text('تمت استعادة آخر نسخة')));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل الاستعادة: $e')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('فشل الاستعادة: $e')));
     }
   }
 
-  Future<void> _clearAllData(BuildContext context) async {
+  Future<void> _clearAllData() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -500,7 +455,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (confirmed != true || !context.mounted) return;
+    if (confirmed != true) return;
+    if (!mounted) return;
 
     final confirmed2 = await showDialog<bool>(
       context: context,
@@ -516,23 +472,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-    if (confirmed2 != true || !context.mounted) return;
+    if (confirmed2 != true) return;
+    if (!mounted) return;
 
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      final dbPath = await getDatabasesPath();
-      final dbFile = File('$dbPath/agridus.db');
-      if (await dbFile.exists()) {
-        await dbFile.delete();
-      }
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('تم مسح جميع البيانات')));
-      }
+      await DatabaseService().clearAllData();
+      if (!mounted) return;
+      await _reloadAllData();
+      messenger.showSnackBar(
+          const SnackBar(content: Text('تم مسح جميع البيانات')));
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('فشل المسح: $e')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('فشل المسح: $e')));
     }
   }
+
+  Future<void> _reloadAllData() async {
+    if (!mounted) return;
+    final crop = context.read<CropProvider>();
+    final calendar = context.read<CalendarProvider>();
+    final tasks = context.read<TaskProvider>();
+    final guide = context.read<GuideProvider>();
+    final market = context.read<MarketProvider>();
+    calendar.resetSeedState();
+    guide.resetSeedState();
+    market.resetSeedState();
+    try {
+      await crop.loadCrops();
+    } catch (_) {}
+    try {
+      await calendar.loadData();
+    } catch (_) {}
+    try {
+      await tasks.loadTasks();
+    } catch (_) {}
+    try {
+      await guide.loadData();
+    } catch (_) {}
+    try {
+      await market.loadData();
+    } catch (_) {}
+  }
 }
+

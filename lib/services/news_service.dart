@@ -1,5 +1,6 @@
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
+import 'package:flutter/foundation.dart';
 import '../services/database_service.dart';
 
 class NewsArticle {
@@ -143,49 +144,18 @@ class NewsService {
   }
 
   static Future<List<NewsArticle>> fetchNews() async {
+    final lists = await Future.wait(
+      _rssFeeds.map(_fetchAndParseFeed),
+    );
+
     final articles = <NewsArticle>[];
-    for (final feedUrl in _rssFeeds) {
-      try {
-        final response = await http
-            .get(Uri.parse(feedUrl))
-            .timeout(const Duration(seconds: 8));
-        if (response.statusCode == 200) {
-          final doc = XmlDocument.parse(response.body);
-          final items = doc.findAllElements('item');
-          for (final item in items) {
-            final title =
-                item.findElements('title').firstOrNull?.innerText ?? '';
-            final description =
-                item.findElements('description').firstOrNull?.innerText ?? '';
-            final link =
-                item.findElements('link').firstOrNull?.innerText ?? '';
-            final pubDate =
-                item.findElements('pubDate').firstOrNull?.innerText;
-
-            final combined = '$title $description';
-            if (_matchesKeywords(combined)) {
-              final sourceName = switch (feedUrl) {
-                'https://www.sudanakhbar.com/rss' => 'اخبار السودان',
-                'https://suna-sd.net/rss' => 'سونا',
-                'https://www.alrakoba.net/feed' => 'الراكوبة',
-                _ => 'مصدر إخباري',
-              };
-
-              articles.add(NewsArticle(
-                title: _cleanHtml(title),
-                source: sourceName,
-                date: pubDate,
-                summary: _cleanHtml(
-                    description.replaceAll(RegExp(r'<[^>]*>'), '').trim()),
-                url: link,
-              ));
-            }
-          }
-        }
-      } catch (_) {}
+    final seen = <String>{};
+    for (final list in lists) {
+      for (final a in list) {
+        final key = a.url.isNotEmpty ? a.url : a.title;
+        if (seen.add(key)) articles.add(a);
+      }
     }
-
-    _hasAttemptedFetch = true;
 
     if (articles.isNotEmpty) {
       _cached = articles.take(20).toList();
@@ -195,21 +165,40 @@ class NewsService {
       await _cacheLocally(_cached);
     }
 
+    _hasAttemptedFetch = true;
+
     return articles.isNotEmpty ? articles : _cached;
+  }
+
+  static Future<List<NewsArticle>> _fetchAndParseFeed(String feedUrl) async {
+    try {
+      final response = await http
+          .get(Uri.parse(feedUrl))
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode != 200) return const [];
+      final sourceName = switch (feedUrl) {
+        'https://www.sudanakhbar.com/rss' => 'اخبار السودان',
+        'https://suna-sd.net/rss' => 'سونا',
+        'https://www.alrakoba.net/feed' => 'الراكوبة',
+        _ => 'مصدر إخباري',
+      };
+      return await compute(
+        _parseFeedXml,
+        {'xml': response.body, 'source': sourceName},
+      );
+    } catch (_) {
+      return const [];
+    }
   }
 
   static Future<List<NewsArticle>> getCachedNews() async {
     if (_cached.isNotEmpty) return _cached;
-    if (!_hasAttemptedFetch) {
-      _cached = _getFallbackNews();
-      return _cached;
-    }
     try {
       final db = DatabaseService();
       final rows = await db.query('news', orderBy: 'cached_at DESC');
       _cached = rows.map((r) => NewsArticle.fromMap(r)).toList();
     } catch (_) {}
-    if (_cached.isEmpty) {
+    if (_cached.isEmpty && !_hasAttemptedFetch) {
       _cached = _getFallbackNews();
     }
     return _cached;
@@ -236,4 +225,30 @@ class NewsService {
         .replaceAll('&nbsp;', ' ')
         .trim();
   }
+}
+
+List<NewsArticle> _parseFeedXml(Map<String, String> input) {
+  final doc = XmlDocument.parse(input['xml'] ?? '');
+  final source = input['source'] ?? 'مصدر إخباري';
+  final out = <NewsArticle>[];
+  for (final item in doc.findAllElements('item')) {
+    final title = item.findElements('title').firstOrNull?.innerText ?? '';
+    final description =
+        item.findElements('description').firstOrNull?.innerText ?? '';
+    final link = item.findElements('link').firstOrNull?.innerText ?? '';
+    final pubDate = item.findElements('pubDate').firstOrNull?.innerText;
+
+    final combined = '$title $description';
+    if (NewsService._matchesKeywords(combined)) {
+      out.add(NewsArticle(
+        title: NewsService._cleanHtml(title),
+        source: source,
+        date: pubDate,
+        summary: NewsService._cleanHtml(
+            description.replaceAll(RegExp(r'<[^>]*>'), '').trim()),
+        url: link,
+      ));
+    }
+  }
+  return out;
 }

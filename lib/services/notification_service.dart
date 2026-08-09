@@ -12,8 +12,19 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   bool _permissionGranted = true;
+  bool _exactAlarmGranted = false;
 
   bool get notificationsPermissionGranted => _permissionGranted;
+  bool get exactAlarmGranted => _exactAlarmGranted;
+
+  static const int testNotificationId = 9999;
+  static const int _taskOffset = 100000;
+  static const int _calendarOffset = 200000;
+  static const int _prayerOffset = 300000;
+
+  static int taskNotificationId(int taskId) => taskId + _taskOffset;
+  static int calendarNotificationId(int id) => id + _calendarOffset;
+  static int prayerNotificationId(int id) => id + _prayerOffset;
 
   bool _globalEnabled = true;
   bool _prayerEnabled = true;
@@ -118,41 +129,52 @@ class NotificationService {
         debugPrint(
             'NotificationService: إذن الإشعارات = $_permissionGranted');
       } catch (_) {}
+      try {
+        _exactAlarmGranted =
+            await androidPlugin.requestExactAlarmsPermission() ?? false;
+        debugPrint(
+            'NotificationService: إذن المنبه الدقيق = $_exactAlarmGranted');
+      } catch (_) {
+        _exactAlarmGranted = false;
+      }
       for (final ch in _prayerChannels) {
         try {
-          await androidPlugin.deleteNotificationChannel(ch.id);
+          await androidPlugin.createNotificationChannel(ch);
         } catch (_) {}
       }
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'weather_channel',
-          'تنبيهات الطقس',
-          description: 'إشعارات حالة الطقس وأحواله',
-          importance: Importance.high,
-          playSound: true,
-        ),
-      );
-      for (final ch in _prayerChannels) {
-        await androidPlugin.createNotificationChannel(ch);
-      }
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'task_channel',
-          'تنبيهات المهام',
-          description: 'إشعارات تذكير المهام',
-          importance: Importance.high,
-          playSound: true,
-        ),
-      );
-      await androidPlugin.createNotificationChannel(
-        const AndroidNotificationChannel(
-          'calendar_channel',
-          'تنبيهات التقويم',
-          description: 'إشعارات التقويم الزراعي',
-          importance: Importance.high,
-          playSound: true,
-        ),
-      );
+      try {
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'weather_channel',
+            'تنبيهات الطقس',
+            description: 'إشعارات حالة الطقس وأحواله',
+            importance: Importance.high,
+            playSound: true,
+          ),
+        );
+      } catch (_) {}
+      try {
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'task_channel',
+            'تنبيهات المهام',
+            description: 'إشعارات تذكير المهام',
+            importance: Importance.high,
+            playSound: true,
+          ),
+        );
+      } catch (_) {}
+      try {
+        await androidPlugin.createNotificationChannel(
+          const AndroidNotificationChannel(
+            'calendar_channel',
+            'تنبيهات التقويم',
+            description: 'إشعارات التقويم الزراعي',
+            importance: Importance.high,
+            playSound: true,
+          ),
+        );
+      } catch (_) {}
     }
 
     _initialized = true;
@@ -164,30 +186,11 @@ class NotificationService {
         'weather_channel', 'تنبيهات الطقس');
   }
 
-  Future<void> showPrayerNotification(String prayerName) async {
-    if (!_globalEnabled || !_prayerEnabled) return;
-    await _show(2000 + prayerName.hashCode, 'حان الآن وقت صلاة $prayerName',
-        'حان وقت صلاة $prayerName - لا تنسَ ذكر الله',
-        _prayerChannelId, 'مواقيت الصلاة', usePrayerSound: true);
-  }
-
   Future<void> testPrayerNotification() async {
     if (!_globalEnabled) return;
-    await _show(9999, 'اختبار صوت الإشعار',
+    await _show(testNotificationId, 'اختبار صوت الإشعار',
         'إذا سمعت هذا الصوت فكل شيء يعمل بشكل صحيح',
         _prayerChannelId, 'مواقيت الصلاة', usePrayerSound: true);
-  }
-
-  Future<void> showTaskNotification(String title) async {
-    if (!_globalEnabled || !_taskEnabled) return;
-    await _show(title.hashCode.abs(), 'تذكير بالمهمة: $title',
-        'حان وقت تنفيذ المهمة', 'task_channel', 'تنبيهات المهام');
-  }
-
-  Future<void> showCalendarAlert(String title) async {
-    if (!_globalEnabled || !_calendarEnabled) return;
-    await _show(title.hashCode.abs() + 5000, 'تنبيه التقويم الزراعي',
-        title, 'calendar_channel', 'تنبيهات التقويم');
   }
 
   Future<void> _show(int id, String title, String body,
@@ -227,7 +230,7 @@ class NotificationService {
         : time;
 
     await _plugin.zonedSchedule(
-      id,
+      prayerNotificationId(id),
       'حان الآن وقت صلاة $prayerName',
       'حان وقت صلاة $prayerName',
       tz.TZDateTime.from(scheduledDate, tz.local),
@@ -239,7 +242,9 @@ class NotificationService {
           presentSound: true,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: _exactAlarmGranted
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
       matchDateTimeComponents: DateTimeComponents.time,
@@ -250,7 +255,7 @@ class NotificationService {
       int id, String title, DateTime time) async {
     if (!_globalEnabled || !_taskEnabled) return;
     await _plugin.zonedSchedule(
-      id,
+      taskNotificationId(id),
       'تذكير بالمهمة: $title',
       'حان وقت تنفيذ المهمة',
       tz.TZDateTime.from(time, tz.local),
@@ -261,7 +266,32 @@ class NotificationService {
           presentSound: true,
         ),
       ),
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: _exactAlarmGranted
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+    );
+  }
+
+  Future<void> scheduleCalendarNotification(
+      int id, String title, DateTime time) async {
+    if (!_globalEnabled || !_calendarEnabled) return;
+    await _plugin.zonedSchedule(
+      calendarNotificationId(id),
+      'تنبيه التقويم الزراعي',
+      title,
+      tz.TZDateTime.from(time, tz.local),
+      NotificationDetails(
+        android: _details('calendar_channel', 'تنبيهات التقويم'),
+        iOS: const DarwinNotificationDetails(
+          presentAlert: true,
+          presentSound: true,
+        ),
+      ),
+      androidScheduleMode: _exactAlarmGranted
+          ? AndroidScheduleMode.exactAllowWhileIdle
+          : AndroidScheduleMode.inexactAllowWhileIdle,
       uiLocalNotificationDateInterpretation:
           UILocalNotificationDateInterpretation.absoluteTime,
     );
