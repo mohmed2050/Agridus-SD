@@ -8,6 +8,7 @@ class WeatherProvider extends ChangeNotifier {
   bool _isLoading = false;
   bool _hasLocation = false;
   String? _error;
+  String? _cityName;
   double _lat = 15.5007;
   double _lon = 32.5599;
 
@@ -41,7 +42,7 @@ class WeatherProvider extends ChangeNotifier {
     }
 
     try {
-      await _requestLocation().timeout(const Duration(seconds: 8));
+      await _requestLocation().timeout(const Duration(seconds: 15));
     } catch (e) {
       debugPrint('WeatherProvider: فشل تحديد الموقع - $e');
     }
@@ -95,6 +96,11 @@ class WeatherProvider extends ChangeNotifier {
           _lon = locData.longitude!;
           _hasLocation = true;
           await WeatherService.saveLastLocation(_lat, _lon);
+          try {
+            _cityName = await WeatherService.fetchCityName(_lat, _lon);
+          } catch (e) {
+            debugPrint('WeatherProvider: فشل جلب اسم المدينة - $e');
+          }
         }
       }
     } catch (_) {}
@@ -102,7 +108,7 @@ class WeatherProvider extends ChangeNotifier {
 
   String get locationName {
     if (_hasLocation) {
-      return 'موقعك الحالي';
+      return _cityName ?? 'موقعك الحالي';
     }
     return 'الخرطوم (افتراضي)';
   }

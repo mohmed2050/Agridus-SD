@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/crop_cost_data.dart';
 import '../services/database_service.dart';
 
@@ -62,7 +63,46 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
 
   String _fmt(double v) => _formatter.format(v);
 
-  Widget _buildCostRow(String label, double amount, {bool isTotal = false}) {
+  CropCostData get _mostProfitableCrop {
+    final sorted = [...CropCostData.all]
+      ..sort((a, b) => b.netProfitPerFeddan.compareTo(a.netProfitPerFeddan));
+    return sorted.first;
+  }
+
+  Future<void> _shareResult(CropCostData c) async {
+    final totalCost = c.totalCostPerFeddan * _feddans;
+    final totalProduction = c.expectedProductionKg * _feddans;
+    final totalRevenue = c.revenuePerFeddan * _feddans;
+    final netProfit = c.netProfitPerFeddan * _feddans;
+
+    final text = '''
+🌾 حاسبة الأرباح - Agridus-SD
+المحصول: ${c.icon} ${c.name}
+المساحة: ${_feddans.toStringAsFixed(0)} فدان
+
+التكاليف:
+- البذور: ${_fmt(c.seedCost * _feddans)} ج.س
+- التسميد: ${_fmt(c.fertilizerCost * _feddans)} ج.س
+- الري: ${_fmt(c.irrigationCost * _feddans)} ج.س
+- العمالة: ${_fmt(c.laborCost * _feddans)} ج.س
+- المبيدات: ${_fmt(c.pesticideCost * _feddans)} ج.س
+- إجمالي التكاليف: ${_fmt(totalCost)} ج.س
+
+الإنتاج المتوقع: ${_fmt(totalProduction)} كجم
+الإيراد المتوقع: ${_fmt(totalRevenue)} ج.س
+صافي الربح المتوقع: ${_fmt(netProfit)} ج.س
+''';
+    try {
+      await SharePlus.instance.share(ShareParams(text: text));
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر المشاركة: $e')));
+    }
+  }
+
+  Widget _buildCostRow(String label, double amount,
+      {bool isTotal = false, String unit = 'ج.س'}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
@@ -72,11 +112,13 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
                   style: TextStyle(
                       fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
                       fontSize: 14))),
-          Text('${_fmt(amount)} ج.س',
+          Text('${_fmt(amount)} $unit',
               style: TextStyle(
                   fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
                   fontSize: 14,
-                  color: isTotal ? const Color(0xFF2E7D32) : Colors.black87)),
+                  color: isTotal
+                      ? const Color(0xFF2E7D32)
+                      : Theme.of(context).colorScheme.onSurface)),
         ],
       ),
     );
@@ -93,6 +135,66 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            color: Colors.green.shade50,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('مقارنة الربحية (لكل فدان)',
+                      style: TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 6),
+                  ...CropCostData.all.map((c) {
+                    final isBest = c.id == _mostProfitableCrop.id;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          Text('${c.icon} ${c.name}',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isBest
+                                      ? FontWeight.bold
+                                      : FontWeight.normal)),
+                          const Spacer(),
+                          Text('${_fmt(c.netProfitPerFeddan)} ج.س',
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isBest
+                                      ? FontWeight.bold
+                                      : FontWeight.normal,
+                                  color: c.netProfitPerFeddan > 0
+                                      ? Colors.green.shade700
+                                      : Colors.red)),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 18),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          'أعلى ربحية حالياً: ${_mostProfitableCrop.name}',
+                          style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade800),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
           Card(
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -242,7 +344,7 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
             const SizedBox(height: 8),
             _buildCostRow(
                 'الإنتاج المتوقع', totalProduction.toDouble(),
-                isTotal: true),
+                isTotal: true, unit: 'كجم'),
             _buildCostRow('الإيراد المتوقع', totalRevenue, isTotal: true),
             const Divider(thickness: 2),
             _buildCostRow('صافي الربح', netProfit, isTotal: true),
@@ -275,6 +377,20 @@ class _ProfitCalculatorScreenState extends State<ProfitCalculatorScreen> {
                   ],
                 ),
               ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.share, size: 18),
+                label: const Text('مشاركة النتيجة'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF2E7D32),
+                  side: BorderSide(color: Colors.green.shade300),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => _shareResult(c),
+              ),
+            ),
           ],
         ),
       ),

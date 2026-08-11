@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../providers/app_provider.dart';
 import '../providers/crop_provider.dart';
 import '../providers/calendar_provider.dart';
 import '../providers/task_provider.dart';
 import '../providers/guide_provider.dart';
 import '../providers/market_provider.dart';
+import '../providers/extension_provider.dart';
 import '../services/notification_service.dart';
 import '../services/database_service.dart';
 import '../services/audio_service.dart';
@@ -326,6 +328,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onTap: () => _backupData(),
         ),
         ListTile(
+          leading: const CircleAvatar(child: Icon(Icons.share)),
+          title: const Text('مشاركة البيانات',
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('إرسال النسخة الاحتياطية عبر واتساب/تيليجرام/بريد'),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          onTap: () => _shareData(),
+        ),
+        ListTile(
           leading: const CircleAvatar(child: Icon(Icons.restore)),
           title: const Text('استعادة بيانات',
               style: TextStyle(fontWeight: FontWeight.bold)),
@@ -354,7 +364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           title: const Text('Agridus-SD',
               style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('الإصدار 3.0.3'),
+          subtitle: const Text('الإصدار 3.0.12'),
         ),
       ]),
     );
@@ -415,6 +425,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SnackBar(content: Text('تم النسخ الاحتياطي: ${backup.path}')));
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('فشل النسخ: $e')));
+    }
+  }
+
+  Future<void> _shareData() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final backup = File(
+          '${dir.path}/agridus_share_${DateTime.now().millisecondsSinceEpoch}.db');
+      await DatabaseService().backupTo(backup.path);
+      await SharePlus.instance.share(ShareParams(
+        text: 'نسخة احتياطية من بيانات تطبيق Agridus-SD',
+        files: [XFile(backup.path)],
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('فشل المشاركة: $e')));
     }
   }
 
@@ -494,9 +520,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final tasks = context.read<TaskProvider>();
     final guide = context.read<GuideProvider>();
     final market = context.read<MarketProvider>();
+    final extension = context.read<ExtensionProvider>();
     calendar.resetSeedState();
     guide.resetSeedState();
     market.resetSeedState();
+    extension.resetSeedState();
     try {
       await crop.loadCrops();
     } catch (_) {}
@@ -511,6 +539,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     } catch (_) {}
     try {
       await market.loadData();
+    } catch (_) {}
+    try {
+      await extension.loadData();
     } catch (_) {}
   }
 }

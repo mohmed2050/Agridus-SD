@@ -111,7 +111,9 @@ class _TasksScreenState extends State<TasksScreen>
                 fontWeight: FontWeight.w500,
                 decoration:
                     task.isCompleted ? TextDecoration.lineThrough : null,
-                color: task.isCompleted ? Colors.grey : Colors.black,
+                color: task.isCompleted
+                    ? Colors.grey
+                    : Theme.of(context).colorScheme.onSurface,
               ),
             ),
             subtitle: task.alertTime != null

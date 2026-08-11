@@ -105,6 +105,17 @@ class GuideProvider extends ChangeNotifier {
 
   static const List<Map<String, dynamic>> _pesticideSeedData = [
     {
+      'trade_name': 'مالاثيون 57% EC',
+      'active_ingredient': 'Malathion 57%',
+      'targets': 'الجراد الصحراوي، الجراد المحلي، المن، الحشرات القارضة',
+      'crops': 'جميع المحاصيل الحقلية',
+      'dosage': '1.5 لتر/فدان',
+      'usage_method': 'رش ضبابي فائق الحجم للجراد أو رش ورقي عادي',
+      'safety_period': '7 أيام',
+      'warnings': 'يستخدم في عمليات المكافحة الجماعية للجراد الصحراوي، سام للنحل',
+      'crop_ids': '1,2,3,4,5',
+    },
+    {
       'trade_name': 'دايمثويت 40% EC',
       'active_ingredient': 'Dimethoate 40%',
       'targets': 'المن، الجاسيد، التربس، حشرات ثاقبة ماصة',

@@ -72,6 +72,33 @@ class WeatherService {
     }
   }
 
+  static Future<String?> fetchCityName(double lat, double lon) async {
+    for (final protocol in ['https', 'http']) {
+      try {
+        final response = await http
+            .get(
+              Uri.parse('$protocol://nominatim.openstreetmap.org/reverse'
+                  '?format=json&lat=$lat&lon=$lon&zoom=10&accept-language=ar'),
+              headers: {'User-Agent': 'AgridusSD/1.0'},
+            )
+            .timeout(const Duration(seconds: 6));
+        if (response.statusCode != 200) continue;
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final address = data['address'] as Map<String, dynamic>?;
+        if (address == null) continue;
+        for (final key in ['city', 'town', 'village', 'county', 'state']) {
+          final value = address[key];
+          if (value != null && value.toString().trim().isNotEmpty) {
+            return value.toString();
+          }
+        }
+      } catch (e) {
+        debugPrint('WeatherService: فشل جلب اسم المدينة - $e');
+      }
+    }
+    return null;
+  }
+
   static String _getWeatherDescription(int code) {
     switch (code) {
       case 0:

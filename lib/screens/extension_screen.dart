@@ -1,9 +1,337 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../providers/extension_provider.dart';
+import '../models/extension_office.dart';
+import '../models/extension_company.dart';
 
-class ExtensionScreen extends StatelessWidget {
+class ExtensionScreen extends StatefulWidget {
   const ExtensionScreen({super.key});
 
-  static const _cropNames = ['أبو سبعين', 'الفول السوداني', 'القمح', 'السمسم', 'البرسيم'];
+  @override
+  State<ExtensionScreen> createState() => _ExtensionScreenState();
+}
+
+class _ExtensionScreenState extends State<ExtensionScreen> {
+  String _selectedState = 'الجزيرة';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ExtensionProvider>().loadData();
+    });
+  }
+
+  Future<void> _call(String phone) async {
+    final uri = Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'\s'), ''));
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر فتح الاتصال: $e')));
+    }
+  }
+
+  Future<void> _openMap(String query) async {
+    final uri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent('$query السودان')}');
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('تعذر فتح الخريطة: $e')));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: DefaultTabController(
+        length: 5,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('الإرشاد الزراعي والطوارئ'),
+            backgroundColor: const Color(0xFF2E7D32),
+            foregroundColor: Colors.white,
+            bottom: const TabBar(
+              isScrollable: true,
+              indicatorColor: Colors.white,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white60,
+              tabs: [
+                Tab(text: 'المكاتب', icon: Icon(Icons.location_city, size: 18)),
+                Tab(text: 'الطوارئ', icon: Icon(Icons.warning, size: 18)),
+                Tab(text: 'الشركات', icon: Icon(Icons.business, size: 18)),
+                Tab(text: 'الإرشاد', icon: Icon(Icons.menu_book, size: 18)),
+                Tab(text: 'التقويم الموسمي', icon: Icon(Icons.calendar_month, size: 18)),
+              ],
+            ),
+          ),
+          body: TabBarView(
+            children: [
+              _buildOfficesTab(),
+              const _EmergencyTab(),
+              _buildCompaniesTab(),
+              const _ExtensionTab(),
+              const _SeasonalTab(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOfficesTab() {
+    return Consumer<ExtensionProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final states = provider.states;
+        final offices = provider.officesForState(_selectedState);
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  labelText: 'اختر الولاية',
+                  border: OutlineInputBorder(),
+                  contentPadding:
+                      EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: states.contains(_selectedState)
+                        ? _selectedState
+                        : (states.isNotEmpty ? states.first : null),
+                    items: states.map((s) => DropdownMenuItem(
+                        value: s, child: Text(s))).toList(),
+                    onChanged: (v) {
+                      if (v != null) setState(() => _selectedState = v);
+                    },
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: offices.isEmpty
+                  ? const Center(
+                      child: Text('لا توجد بيانات لهذه الولاية',
+                          style: TextStyle(fontSize: 16, color: Colors.grey)))
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      itemCount: offices.length,
+                      itemBuilder: (context, i) =>
+                          _buildOfficeCard(offices[i]),
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildOfficeCard(ExtensionOffice office) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Colors.green.shade100,
+                  child: const Icon(Icons.corporate_fare,
+                      color: Color(0xFF2E7D32)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('مكتب إرشاد ${office.state}',
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+              ],
+            ),
+            const Divider(),
+            _infoRow(Icons.location_on, 'العنوان', office.address),
+            _infoRow(Icons.person, 'المهندس المسؤول', office.engineerName),
+            _infoRow(Icons.schedule, 'دوام العمل', office.workingHours),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.call, size: 18),
+                    label: const Text('اتصال', style: TextStyle(fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2E7D32),
+                      side: BorderSide(color: Colors.green.shade300),
+                    ),
+                    onPressed: () => _call(office.phone),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.map, size: 18),
+                    label: const Text('الموقع', style: TextStyle(fontSize: 13)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.blue.shade700,
+                      side: BorderSide(color: Colors.blue.shade200),
+                    ),
+                    onPressed: () => _openMap('${office.state} - ${office.address}'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          SizedBox(
+              width: 90,
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 13, color: Colors.grey[600],
+                      fontWeight: FontWeight.w500))),
+          Expanded(
+            child: Text(value,
+                style: const TextStyle(fontSize: 13, height: 1.4)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompaniesTab() {
+    return Consumer<ExtensionProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: 'بحث بالاسم أو المنتجات أو الموقع...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+                onChanged: (v) => provider.search(v),
+              ),
+            ),
+            Expanded(
+              child: provider.filteredCompanies.isEmpty
+                  ? const Center(
+                      child: Text('لا توجد شركات مطابقة',
+                          style: TextStyle(fontSize: 16, color: Colors.grey)))
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      itemCount: provider.filteredCompanies.length,
+                      itemBuilder: (context, i) {
+                        final c = provider.filteredCompanies[i];
+                        return _buildCompanyCard(c);
+                      },
+                    ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCompanyCard(ExtensionCompany company) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ExpansionTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.indigo.shade100,
+          child: const Icon(Icons.business, color: Colors.indigo),
+        ),
+        title: Text(company.companyName,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        subtitle: Text(company.products,
+            style: const TextStyle(fontSize: 12), maxLines: 1,
+            overflow: TextOverflow.ellipsis),
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _infoRow(Icons.category, 'المنتجات', company.products),
+                _infoRow(Icons.location_on, 'الموقع', company.location),
+                _infoRow(Icons.info_outline, 'نبذة', company.description),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.call, size: 18),
+                        label: const Text('اتصال',
+                            style: TextStyle(fontSize: 13)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF2E7D32),
+                          side: BorderSide(color: Colors.green.shade300),
+                        ),
+                        onPressed: () => _call(company.phone),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.map, size: 18),
+                        label: const Text('الموقع',
+                            style: TextStyle(fontSize: 13)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.blue.shade700,
+                          side: BorderSide(color: Colors.blue.shade200),
+                        ),
+                        onPressed: () =>
+                            _openMap('${company.companyName} - ${company.location}'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExtensionTab extends StatelessWidget {
+  const _ExtensionTab();
+
+  static const _cropNames = [
+    'أبو سبعين', 'الفول السوداني', 'القمح', 'السمسم', 'البرسيم'];
 
   static const _cropData = {
     'أبو سبعين': {
@@ -58,79 +386,25 @@ class ExtensionScreen extends StatelessWidget {
     },
   };
 
-  static const _emergencyData = [
-    {'title': 'التسمم بالمبيدات - إسعافات أولية', 'body': '1. اتصل بالإسعاف فوراً\n2. انقل المصاب للهواء الطلق\n3. اخلع الملابس الملوثة\n4. اغسل الجلد بالماء والصابون\n5. لا تحفز التقيؤ إلا بتعليمات طبية\n6. احتفظ بعبوة المبيد للتعريف'},
-    {'title': 'الإدارة العامة لوقاية النباتات', 'body': 'الخرطوم - تلفون: 0183745678\nفاكس: 0183745679\nالبريد: plant.protection@sudanagri.sd'},
-    {'title': 'هيئة الأرصاد الجوية السودانية', 'body': 'الخرطوم - تلفون: 0183771234\nالإنذار المبكر: 0183771235\nخدمة المزارعين: 0183771236'},
-    {'title': 'غرفة طوارئ الآفات الزراعية', 'body': 'بلاغات تفشي الآفات:\nتلفون: 0183745680\nواتساب: 0912345678\nطوارئ 24 ساعة: 0900567890'},
-    {'title': 'مديريات الزراعة بالولايات', 'body': 'الخرطوم: 0183772000\nالقضارف: 0441123456\nكسلا: 0442123456\nالنيل الأزرق: 0541123456\nسنار: 0542123456\nالشمالية: 0241123456'},
-    {'title': 'الطوارئ العامة', 'body': 'الدفاع المدني: 998\nالإسعاف: 999\nالشرطة: 999\nالمستشفى البيطري: 0183777000'},
-  ];
-
-  static const _seasonalData = [
-    {'crop': 'أبو سبعين', 'plant': 'يونيو - يوليو', 'grow': '90-120 يوم', 'harvest': 'أكتوبر - ديسمبر', 'color': '0xFFFFA726'},
-    {'crop': 'الفول السوداني', 'plant': 'يونيو - يوليو', 'grow': '120-150 يوم', 'harvest': 'نوفمبر - يناير', 'color': '0xFF66BB6A'},
-    {'crop': 'القمح', 'plant': 'نوفمبر - ديسمبر', 'grow': '120-150 يوم', 'harvest': 'مارس - أبريل', 'color': '0xFF42A5F5'},
-    {'crop': 'السمسم', 'plant': 'يوليو - أغسطس', 'grow': '90-120 يوم', 'harvest': 'نوفمبر - ديسمبر', 'color': '0xFFAB47BC'},
-    {'crop': 'البرسيم', 'plant': 'سبتمبر - أكتوبر', 'grow': '60 يوم (حشة)', 'harvest': 'طوال العام', 'color': '0xFF26A69A'},
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: DefaultTabController(
-        length: 3,
-        child: Scaffold(
-          appBar: AppBar(
-            title: const Text('الإرشاد الزراعي'),
-            backgroundColor: const Color(0xFF2E7D32),
-            foregroundColor: Colors.white,
-            bottom: const TabBar(
-              isScrollable: true,
-              indicatorColor: Colors.white,
-              labelColor: Colors.white,
-              unselectedLabelColor: Colors.white60,
-              tabs: [
-                Tab(text: 'الإرشاد', icon: Icon(Icons.menu_book, size: 18)),
-                Tab(text: 'الطوارئ', icon: Icon(Icons.warning, size: 18)),
-                Tab(text: 'التقويم الموسمي', icon: Icon(Icons.calendar_month, size: 18)),
-              ],
-            ),
-          ),
-          body: const TabBarView(
-            children: [
-              _ExtensionTab(),
-              _EmergencyTab(),
-              _SeasonalTab(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ExtensionTab extends StatelessWidget {
-  const _ExtensionTab();
-
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: ExtensionScreen._cropNames.length,
+      itemCount: _cropNames.length,
       itemBuilder: (context, i) {
-        final name = ExtensionScreen._cropNames[i];
-        final data = ExtensionScreen._cropData[name]!;
+        final name = _cropNames[i];
+        final data = _cropData[name]!;
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ExpansionTile(
             leading: CircleAvatar(
               backgroundColor: Colors.green.shade100,
-              child: Text('${i + 1}', style: TextStyle(color: Colors.green.shade700)),
+              child: Text('${i + 1}',
+                  style: TextStyle(color: Colors.green.shade700)),
             ),
-            title: Text(name, style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(name,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${data['مقدمة']!.substring(0, 50)}...'),
             children: data.entries.map((e) {
               if (e.key == 'مقدمة') return const SizedBox.shrink();
@@ -160,27 +434,87 @@ class _ExtensionTab extends StatelessWidget {
 class _EmergencyTab extends StatelessWidget {
   const _EmergencyTab();
 
+  static const _emergencyData = [
+    {'title': 'التسمم بالمبيدات - إسعافات أولية', 'body': '1. اتصل بالإسعاف فوراً\n2. انقل المصاب للهواء الطلق\n3. اخلع الملابس الملوثة\n4. اغسل الجلد بالماء والصابون\n5. لا تحفز التقيؤ إلا بتعليمات طبية\n6. احتفظ بعبوة المبيد للتعريف', 'phone': '999'},
+    {'title': 'الإدارة العامة لوقاية النباتات', 'body': 'الخرطوم - بلاغات الآفات والمبيدات\nفاكس: 0183745679\nالبريد: plant.protection@sudanagri.sd', 'phone': '0183745678'},
+    {'title': 'هيئة الأرصاد الجوية السودانية', 'body': 'الخرطوم - الإنذار المبكر\nخدمة المزارعين: 0183771236', 'phone': '0183771235'},
+    {'title': 'غرفة طوارئ الآفات الزراعية', 'body': 'بلاغات تفشي الآفات - طوارئ 24 ساعة\nواتساب: 0912345678', 'phone': '0900567890'},
+    {'title': 'الجراد الصحراوي', 'body': 'مركز عمليات مكافحة الجراد الصحراوي\nإبلاغ فوري عن أسراب أو دبا', 'phone': '0912345679'},
+    {'title': 'الدفاع المدني', 'body': 'الحوادث والحرائق الزراعية', 'phone': '998'},
+    {'title': 'الإسعاف والشرطة', 'body': 'حالات الطوارئ العامة', 'phone': '999'},
+    {'title': 'المستشفى البيطري', 'body': 'الأمراض الحيوانية الوبائية', 'phone': '0183777000'},
+  ];
+
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: ExtensionScreen._emergencyData.length,
+      itemCount: _emergencyData.length,
       itemBuilder: (context, i) {
-        final item = ExtensionScreen._emergencyData[i];
+        final item = _emergencyData[i];
+        final isCritical = i < 2 || item['phone'] == '999' || item['phone'] == '998';
         return Card(
           margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: CircleAvatar(
-              backgroundColor: Colors.red.shade100,
-              child: Icon(Icons.warning_amber, color: Colors.red.shade700),
-            ),
-            title: Text(item['title']!,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(item['body']!, textAlign: TextAlign.start),
+          color: isCritical ? Colors.red.shade50 : Colors.orange.shade50,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(
+                color: isCritical ? Colors.red.shade200 : Colors.orange.shade200),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: isCritical
+                          ? Colors.red.shade100
+                          : Colors.orange.shade100,
+                      child: Icon(Icons.warning_amber,
+                          color: isCritical ? Colors.red : Colors.orange.shade800),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(item['title']!,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(item['body']!, textAlign: TextAlign.start),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.call, size: 18),
+                    label: Text('اتصال سريع: ${item['phone']}',
+                        style: const TextStyle(fontSize: 13)),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: isCritical
+                          ? Colors.red.shade600
+                          : Colors.orange.shade700,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () async {
+                      final uri = Uri(
+                          scheme: 'tel',
+                          path: (item['phone'] as String)
+                              .replaceAll(RegExp(r'\s'), ''));
+                      try {
+                        await launchUrl(uri,
+                            mode: LaunchMode.externalApplication);
+                      } catch (e) {
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('تعذر فتح الاتصال: $e')));
+                      }
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -191,6 +525,14 @@ class _EmergencyTab extends StatelessWidget {
 
 class _SeasonalTab extends StatelessWidget {
   const _SeasonalTab();
+
+  static const _seasonalData = [
+    {'crop': 'أبو سبعين', 'plant': 'يونيو - يوليو', 'grow': '90-120 يوم', 'harvest': 'أكتوبر - ديسمبر', 'color': '0xFFFFA726'},
+    {'crop': 'الفول السوداني', 'plant': 'يونيو - يوليو', 'grow': '120-150 يوم', 'harvest': 'نوفمبر - يناير', 'color': '0xFF66BB6A'},
+    {'crop': 'القمح', 'plant': 'نوفمبر - ديسمبر', 'grow': '120-150 يوم', 'harvest': 'مارس - أبريل', 'color': '0xFF42A5F5'},
+    {'crop': 'السمسم', 'plant': 'يوليو - أغسطس', 'grow': '90-120 يوم', 'harvest': 'نوفمبر - ديسمبر', 'color': '0xFFAB47BC'},
+    {'crop': 'البرسيم', 'plant': 'سبتمبر - أكتوبر', 'grow': '60 يوم (حشة)', 'harvest': 'طوال العام', 'color': '0xFF26A69A'},
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -207,7 +549,7 @@ class _SeasonalTab extends StatelessWidget {
                   const Text('التقويم الموسمي للمحاصيل',
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
-                  ...ExtensionScreen._seasonalData.map((s) {
+                  ..._seasonalData.map((s) {
                     final months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
                         'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
                     final color = Color(int.parse(s['color']!.replaceFirst('0x', '0xFF')));

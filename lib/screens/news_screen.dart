@@ -153,9 +153,9 @@ class _NewsScreenState extends State<NewsScreen> {
                     const SizedBox(height: 8),
                     Text(
                       article.summary,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: Colors.black87,
+                        color: Theme.of(context).colorScheme.onSurface,
                         height: 1.5,
                       ),
                       maxLines: 3,
@@ -170,7 +170,9 @@ class _NewsScreenState extends State<NewsScreen> {
                       label: const Text('اقرأ المزيد'),
                       onPressed: () async {
                         final uri = Uri.tryParse(article.url);
-                        if (uri != null) {
+                        if (uri != null &&
+                            (uri.scheme == 'http' ||
+                                uri.scheme == 'https')) {
                           final messenger = ScaffoldMessenger.of(context);
                           try {
                             if (await canLaunchUrl(uri)) {

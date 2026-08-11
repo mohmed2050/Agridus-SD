@@ -9,6 +9,7 @@ import 'providers/task_provider.dart';
 import 'providers/calendar_provider.dart';
 import 'providers/guide_provider.dart';
 import 'providers/market_provider.dart';
+import 'providers/extension_provider.dart';
 import 'services/notification_service.dart';
 import 'services/weather_service.dart';
 import 'screens/home_screen.dart';
@@ -43,6 +44,7 @@ class AgridusApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => CalendarProvider()),
         ChangeNotifierProvider(create: (_) => GuideProvider()),
         ChangeNotifierProvider(create: (_) => MarketProvider()),
+        ChangeNotifierProvider(create: (_) => ExtensionProvider()),
       ],
       child: Consumer<AppProvider>(
         builder: (context, provider, _) {

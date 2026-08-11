@@ -22,7 +22,7 @@ class DatabaseService {
     String path = join(await getDatabasesPath(), 'agridus.db');
     return await openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -119,6 +119,7 @@ class DatabaseService {
     await _createProfitTables(db);
     await _createGuideTables(db);
     await _createMarketTables(db);
+    await _createExtensionTables(db);
   }
 
   Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -134,6 +135,9 @@ class DatabaseService {
     if (oldVersion < 5) {
       await _createMarketTables(db);
     }
+    if (oldVersion < 6) {
+      await _createExtensionTables(db);
+    }
   }
 
   Future<void> _createMarketTables(Database db) async {
@@ -145,6 +149,29 @@ class DatabaseService {
         price REAL NOT NULL,
         last_week_price REAL,
         updated_at TEXT
+      )
+    ''');
+  }
+
+  Future<void> _createExtensionTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS extension_offices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        state TEXT NOT NULL,
+        address TEXT,
+        phone TEXT,
+        engineer_name TEXT,
+        working_hours TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS extension_companies (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        company_name TEXT NOT NULL,
+        products TEXT,
+        phone TEXT,
+        location TEXT,
+        description TEXT
       )
     ''');
   }

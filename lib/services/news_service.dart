@@ -39,27 +39,37 @@ class NewsArticle {
 class NewsService {
   static const List<String> _keywords = [
     'زراعة',
+    'زراعي',
     'محاصيل',
-    'فلاحين',
+    'محصول',
+    'مزارع',
     'مزارعين',
+    'فلاح',
+    'فلاحين',
     'تمويل زراعي',
     'أسعار المحاصيل',
     'موسم زراعي',
+    'موسم أمطار',
+    'أمطار موسمية',
     'هلال',
-    'زراعي',
-    'محصول',
     'أسمدة',
+    'سماد',
+    'مبيد',
+    'مبيدات',
+    'آفات',
+    'آفة',
     'ري',
+    'سقي',
     'غذاء',
     'أمن غذائي',
     'صادرات',
     'حيوان',
     'مواشي',
+    'ماشية',
     'ثروة حيوانية',
     'غابات',
     'بيئة',
     'مياه',
-    'سقي',
     'حصاد',
     'بذور',
     'تقاوي',
@@ -235,8 +245,12 @@ List<NewsArticle> _parseFeedXml(Map<String, String> input) {
     final title = item.findElements('title').firstOrNull?.innerText ?? '';
     final description =
         item.findElements('description').firstOrNull?.innerText ?? '';
-    final link = item.findElements('link').firstOrNull?.innerText ?? '';
+    final link = NewsService._cleanHtml(
+            item.findElements('link').firstOrNull?.innerText ?? '')
+        .trim();
     final pubDate = item.findElements('pubDate').firstOrNull?.innerText;
+
+    if (title.isEmpty || link.isEmpty) continue;
 
     final combined = '$title $description';
     if (NewsService._matchesKeywords(combined)) {

@@ -262,7 +262,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
             _alertLabel(alert.alertType),
             style: TextStyle(
               fontSize: 13,
-              color: alert.enabled ? Colors.black87 : Colors.grey,
+              color: alert.enabled
+                  ? Theme.of(context).colorScheme.onSurface
+                  : Colors.grey,
             ),
           ),
         ),
@@ -283,7 +285,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
           ),
           Expanded(
             child: Text(value,
-                style: const TextStyle(fontSize: 14, color: Colors.black87)),
+                style: TextStyle(
+                    fontSize: 14,
+                    color: Theme.of(context).colorScheme.onSurface)),
           ),
         ],
       ),
