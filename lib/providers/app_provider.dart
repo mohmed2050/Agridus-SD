@@ -4,7 +4,7 @@ import '../services/notification_service.dart';
 import '../services/weather_service.dart';
 
 class AppProvider extends ChangeNotifier {
-  int _currentTabIndex = 0;
+  int _currentTabIndex = 1;
   bool _isDarkMode = false;
   bool _notificationsEnabled = true;
   bool _prayerAlertsEnabled = true;

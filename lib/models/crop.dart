@@ -3,6 +3,13 @@ class Crop {
   final String name;
   final String nameEn;
   final String icon;
+  final String description;
+  final String seasonMonths;
+  final String growthDays;
+  final String averageYield;
+  final String image;
+  final String iconTheme;
+  final String category;
   final String pests;
   final String diseases;
   final String season;
@@ -20,6 +27,13 @@ class Crop {
     required this.name,
     required this.nameEn,
     required this.icon,
+    required this.description,
+    required this.seasonMonths,
+    required this.growthDays,
+    required this.averageYield,
+    required this.image,
+    required this.iconTheme,
+    required this.category,
     required this.pests,
     required this.diseases,
     required this.season,
@@ -39,6 +53,13 @@ class Crop {
       name: json['name'],
       nameEn: json['name_en'],
       icon: json['icon'],
+      description: json['description'] ?? '',
+      seasonMonths: json['season_months'] ?? '',
+      growthDays: json['growth_days'] ?? '',
+      averageYield: json['average_yield'] ?? '',
+      image: json['image'] ?? '',
+      iconTheme: json['icon_theme'] ?? 'green',
+      category: json['category'] ?? '',
       pests: json['pests'],
       diseases: json['diseases'],
       season: json['season'],

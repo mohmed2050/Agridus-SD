@@ -6,9 +6,38 @@ import '../models/crop.dart';
 class CropProvider extends ChangeNotifier {
   List<Crop> _crops = [];
   bool _isLoading = false;
+  String _searchQuery = '';
+  String _filterCategory = '';
 
   List<Crop> get crops => _crops;
   bool get isLoading => _isLoading;
+  String get filterCategory => _filterCategory;
+
+  List<Crop> get filteredCrops {
+    var list = _crops;
+    final q = _searchQuery.trim();
+    if (q.isNotEmpty) {
+      list = list.where((c) {
+        return c.name.contains(q) ||
+            c.nameEn.toLowerCase().contains(q.toLowerCase()) ||
+            c.description.contains(q);
+      }).toList();
+    }
+    if (_filterCategory.isNotEmpty) {
+      list = list.where((c) => c.category == _filterCategory).toList();
+    }
+    return list;
+  }
+
+  void search(String query) {
+    _searchQuery = query;
+    notifyListeners();
+  }
+
+  void setFilterCategory(String category) {
+    _filterCategory = category;
+    notifyListeners();
+  }
 
   Future<void> loadCrops() async {
     _isLoading = true;
