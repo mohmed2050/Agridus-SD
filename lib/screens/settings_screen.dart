@@ -364,7 +364,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ListTile(
           title: const Text('Agridus-SD',
               style: TextStyle(fontWeight: FontWeight.bold)),
-          subtitle: const Text('الإصدار 3.0.12'),
+          subtitle: const Text('الإصدار 3.1.0'),
         ),
       ]),
     );
